@@ -59,7 +59,7 @@ DEFAULT_LIMIT = 50
 
 EXCEPTIONS_PY = """\
 class {Domain}NotFoundError(Exception):
-    \"\"\"Se dispara cuando no se encuentra un recurso de {domain}.\"\"\"
+    \"\"\"Se dispara cuando no se encuentra un recurso de {domain_py}.\"\"\"
     pass
 """
 
@@ -88,17 +88,17 @@ from .exceptions import {Domain}NotFoundError
 _DB = {{}}
 _SEQ = 0
 
-def create_{domain}(nombre: str) -> {Domain}:
+def create_{domain_py}(nombre: str) -> {Domain}:
     global _SEQ
     _SEQ += 1
     inst = {Domain}(_SEQ, nombre)
     _DB[_SEQ] = inst
     return inst
 
-def list_{domain}s(limit: int = 50) -> list[{Domain}]:
+def list_{domain_py}s(limit: int = 50) -> list[{Domain}]:
     return list(_DB.values())[:limit]
 
-def get_{domain}(id_: int) -> {Domain}:
+def get_{domain_py}(id_: int) -> {Domain}:
     if id_ not in _DB:
         raise {Domain}NotFoundError()
     return _DB[id_]
@@ -107,7 +107,7 @@ def get_{domain}(id_: int) -> {Domain}:
 ROUTER_PY = """\
 from fastapi import APIRouter, HTTPException, Query
 from .schemas import {Domain}Create, {Domain}Out
-from .services import create_{domain}, list_{domain}s, get_{domain}
+from .services import create_{domain_py}, list_{domain_py}s, get_{domain_py}
 from .exceptions import {Domain}NotFoundError
 from .constants import DEFAULT_LIMIT
 
@@ -115,18 +115,18 @@ router = APIRouter()
 
 @router.post("/", response_model={Domain}Out)
 def create(payload: {Domain}Create):
-    obj = create_{domain}(payload.nombre)
+    obj = create_{domain_py}(payload.nombre)
     return {{"id": obj.id, "nombre": obj.nombre}}
 
 @router.get("/", response_model=list[{Domain}Out])
 def list_all(limit: int = Query(DEFAULT_LIMIT, ge=1, le=500)):
-    objs = list_{domain}s(limit=limit)
+    objs = list_{domain_py}s(limit=limit)
     return [{{"id": o.id, "nombre": o.nombre}} for o in objs]
 
 @router.get("/{{id_}}", response_model={Domain}Out)
 def get_one(id_: int):
     try:
-        o = get_{domain}(id_)
+        o = get_{domain_py}(id_)
         return {{"id": o.id, "nombre": o.nombre}}
     except {Domain}NotFoundError:
         raise HTTPException(status_code=404, detail="{Domain} no encontrado")
@@ -151,15 +151,15 @@ from src.main import app
 import pytest
 
 @pytest.mark.anyio
-async def test_{domain}_crud():
+async def test_{domain_py}_crud():
     async with AsyncClient(app=app, base_url="http://test") as ac:
-        r = await ac.post("/{domain}/", json={{"nombre": "ejemplo"}})
+        r = await ac.post("/{domain_url}/", json={{"nombre": "ejemplo"}})
         assert r.status_code == 200
         data = r.json()
-        r = await ac.get("/{domain}/")
+        r = await ac.get("/{domain_url}/")
         assert r.status_code == 200
         assert len(r.json()) >= 1
-        r = await ac.get(f"/{domain}/{{data['id']}}")
+        r = await ac.get(f"/{domain_url}/{{data['id']}}")
         assert r.status_code == 200
 """
 
@@ -223,7 +223,6 @@ def write_compose(text: str):
     COMPOSE_FILE.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
 
 def extract_used_ports(compose_text: str) -> set[int]:
-    # Captura - "8001:8000", - '8001:8000', o - 8001:8000
     ports = set()
     for m in re.finditer(r'-\s*["\']?(\d{4,5})\s*:\s*8000["\']?', compose_text):
         try:
@@ -243,7 +242,6 @@ def add_service_to_compose(service_key: str, api_dir: str, host_port: int, verbo
     text = read_compose()
     if not re.search(r"(?m)^\s*services\s*:\s*$", text):
         text = "services:\n" + text
-    # Evitar duplicado
     if re.search(rf"(?m)^\s*{re.escape(service_key)}\s*:\s*$", text):
         raise RuntimeError(f"El servicio '{service_key}' ya existe en docker-compose.yml")
     block = COMPOSE_SERVICE_TEMPLATE.format(service_key=service_key, api_dir=api_dir, host_port=host_port)
@@ -257,24 +255,28 @@ def write_file(path: Path, content: str, verbose: bool):
     path.write_text(content, encoding="utf-8")
     log(f"Escrito: {path}", verbose)
 
-def create_domain(src_dir: Path, tests_dir: Path, domain: str, verbose: bool):
-    Domain = domain.capitalize()
-    domain_dir = src_dir / domain
+def create_domain(src_dir: Path, tests_dir: Path, domain_url: str, domain_py: str, verbose: bool):
+    Domain = domain_py.capitalize()
+    # El directorio del paquete usa el nombre Python-safe (con guion bajo)
+    domain_dir = src_dir / domain_py
     domain_dir.mkdir(parents=True, exist_ok=True)
     write_file(domain_dir / "__init__.py", "", verbose)
     write_file(domain_dir / "constants.py", CONSTANTS_PY, verbose)
-    write_file(domain_dir / "exceptions.py", EXCEPTIONS_PY.format(Domain=Domain, domain=domain), verbose)
+    write_file(domain_dir / "exceptions.py", EXCEPTIONS_PY.format(Domain=Domain, domain_py=domain_py), verbose)
     write_file(domain_dir / "schemas.py", SCHEMAS_PY.format(Domain=Domain), verbose)
     write_file(domain_dir / "models.py", MODELS_PY.format(Domain=Domain), verbose)
-    write_file(domain_dir / "services.py", SERVICES_PY.format(Domain=Domain, domain=domain), verbose)
-    write_file(domain_dir / "router.py", ROUTER_PY.format(Domain=Domain, domain=domain), verbose)
+    write_file(domain_dir / "services.py", SERVICES_PY.format(Domain=Domain, domain_py=domain_py), verbose)
+    write_file(domain_dir / "router.py", ROUTER_PY.format(Domain=Domain, domain_py=domain_py), verbose)
     # test
-    write_file(tests_dir / f"test_{domain}.py", TEST_DOMAIN.format(domain=domain), verbose)
+    write_file(tests_dir / f"test_{domain_py}.py", TEST_DOMAIN.format(domain_py=domain_py, domain_url=domain_url), verbose)
 
 def create_api(name: str, domains: List[str], port: int | None, no_compose: bool, force: bool, verbose: bool):
     ensure_base(verbose)
     name = sanitize_name(name)
-    domains = [sanitize_name(d) for d in domains] if domains else [name]
+    
+    # Generar ambas versiones de los nombres de dominio
+    domain_names_url = [sanitize_name(d) for d in domains] if domains else [name]
+    domain_pairs = [(d_url, d_url.replace('-', '_')) for d_url in domain_names_url]
 
     api_dir_name = f"api-{name}"
     api_dir = BACKEND_DIR / api_dir_name
@@ -289,11 +291,8 @@ def create_api(name: str, domains: List[str], port: int | None, no_compose: bool
     tests_dir.mkdir(parents=True, exist_ok=True)
 
     # ---- Templates desde docker/templates ----
-    # requirements.txt (sin placeholders)
     reqs_content = read_text(TEMPLATES_DIR / "requirements.txt")
     write_file(api_dir / "requirements.txt", reqs_content, verbose)
-
-    # .env.template (con placeholders {app_title}, {service_key})
     env_content = render_template(TEMPLATES_DIR / ".env.template",
                                   app_title=f"API {name}",
                                   service_key=name)
@@ -306,19 +305,18 @@ def create_api(name: str, domains: List[str], port: int | None, no_compose: bool
     write_file(tests_dir / "__init__.py", "", verbose)
     write_file(tests_dir / "test_main.py", TEST_MAIN, verbose)
 
-    # Crear base SQLite específica
     db_file = api_dir / f"bd-{name}.sqlite3"
     if not db_file.exists():
         db_file.touch()
         log(f"Base SQLite creada: {db_file}", verbose)
 
-    # Domains
-    for d in domains:
-        create_domain(src_dir, tests_dir, d, verbose)
+    # Domains - ahora pasamos ambas versiones del nombre
+    for domain_url, domain_py in domain_pairs:
+        create_domain(src_dir, tests_dir, domain_url, domain_py, verbose)
 
-    # main.py (importa e incluye todos los routers)
-    imports = "\n".join([f"from .{d}.router import router as {d}_router" for d in domains])
-    includes = "\n".join([f'app.include_router({d}_router, prefix="/{d}", tags=["{d}"])' for d in domains])
+    # main.py (usa la versión correcta para cada caso)
+    imports = "\n".join([f"from .{d_py}.router import router as {d_py}_router" for _, d_py in domain_pairs])
+    includes = "\n".join([f'app.include_router({d_py}_router, prefix="/{d_url}", tags=["{d_url}"])' for d_url, d_py in domain_pairs])
     write_file(src_dir / "main.py", MAIN_PY.format(app_title=f"API {name}", service_key=name, imports=imports, includes=includes), verbose)
 
     print(f"✅ API creada en: {api_dir}")

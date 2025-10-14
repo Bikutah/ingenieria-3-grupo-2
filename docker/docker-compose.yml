@@ -1,0 +1,10 @@
+services:
+  mozo-y-cliente:
+    build:
+      context: ../backend/api-mozo-y-cliente
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    volumes:
+      - ../backend/api-mozo-y-cliente:/app
+    restart: always
