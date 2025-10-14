@@ -1,1 +1,0 @@
-DEFAULT_LIMIT = 50

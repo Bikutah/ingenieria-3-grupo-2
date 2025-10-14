@@ -1,8 +1,11 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
-class MozoCreate(BaseModel):
+class MozoBase(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=100)
 
-class MozoOut(BaseModel):
+class MozoCreate(MozoBase):
+    pass
+
+class MozoOut(MozoBase):
     id: int
-    nombre: str
+    model_config = ConfigDict(from_attributes=True) # Permite que Pydantic lea desde objetos ORM
