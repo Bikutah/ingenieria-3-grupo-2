@@ -1,7 +1,8 @@
 services:
   frontend:
     build:
-      context: ./frontend
+      context: ../frontend
+      dockerfile: Dockerfile
     container_name: frontend
     ports:
       - "5173:80"   # accedés en http://localhost:5173
