@@ -1,4 +1,14 @@
 services:
+  frontend:
+    build:
+      context: ./frontend
+    container_name: frontend
+    ports:
+      - "5173:80"   # accedés en http://localhost:5173
+    depends_on:
+      - mozo-y-cliente
+    restart: unless-stopped
+
   mozo-y-cliente:
     build:
       context: ../backend/api-mozo-y-cliente
