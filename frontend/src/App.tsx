@@ -47,7 +47,7 @@ function App() {
 
   return (
     <div className="container">
-      <h1>Lista de Mozos</h1>
+      <h1>Lista de Mozitos</h1>
       
       {mozos.length === 0 ? (
         <p>No hay mozos registrados</p>

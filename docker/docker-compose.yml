@@ -5,7 +5,14 @@ services:
       dockerfile: Dockerfile
     container_name: frontend
     ports:
-      - "5174:80"   # accedés en http://localhost:5174
+      - "5174:5173"   # accedés en http://localhost:5174
+    volumes:
+      - ../frontend:/app:cached   # tu código en vivo
+      - /app/node_modules        # evita pisar node_modules
+    environment:
+      # En Mac/Windows (Docker Desktop) mejora la detección de cambios
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
     depends_on:
       - mozo-y-cliente
     restart: unless-stopped

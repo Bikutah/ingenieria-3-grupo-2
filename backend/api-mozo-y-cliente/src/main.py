@@ -26,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],  # Permite todos los headers
 )
 
-@app.get("/vida")
+@app.get("/health")
 def health():
     return {"status": "ok", "service": "mozo-y-cliente"}
 
