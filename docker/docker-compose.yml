@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: frontend
     ports:
-      - "5173:80"   # accedés en http://localhost:5173
+      - "5174:80"   # accedés en http://localhost:5174
     depends_on:
       - mozo-y-cliente
     restart: unless-stopped
