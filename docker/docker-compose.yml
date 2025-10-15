@@ -8,3 +8,5 @@ services:
     volumes:
       - ../backend/api-mozo-y-cliente:/app
     restart: always
+    env_file:
+      - ../backend/api-mozo-y-cliente/.env
