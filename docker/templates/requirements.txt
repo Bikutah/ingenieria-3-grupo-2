@@ -7,3 +7,5 @@ python-dotenv>=1.0
 httpx>=0.27
 anyio>=4
 pytest>=8
+fastapi-filter==0.3.1
+fastapi-pagination==0.14.3

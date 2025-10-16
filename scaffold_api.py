@@ -115,9 +115,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 EXPOSE 8000
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.main:app", "--reload", "--host", "0.0.0.0","--port", "8000"]
 """
 
+# >>>> AQUI: main con add_pagination
 MAIN_PY = """\
 from fastapi import FastAPI
 from .database import engine
@@ -127,6 +128,8 @@ from .database import engine
 # Crea las tablas en la base de datos (si no existen)
 {create_tables}
 
+from fastapi_pagination import add_pagination
+
 app = FastAPI(title="{app_title}")
 
 @app.get("/health")
@@ -134,6 +137,9 @@ def health():
     return {{"status": "ok", "service": "{service_key}"}}
 
 {includes}
+
+# activa paginación (page/size en Swagger)
+add_pagination(app)
 """
 
 SCHEMAS_PY = """\
@@ -150,8 +156,9 @@ class {Domain}Out({Domain}Base):
     model_config = ConfigDict(from_attributes=True) # Permite que Pydantic lea desde objetos ORM
 """
 
+# >>>> AQUI: modelo con created_at opcional (útil para ordenar/filtrar). Si no lo querés, podés quitarlo.
 MODELS_PY = """\
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, DateTime, func
 from ..database import Base
 
 class {Domain}(Base):
@@ -159,14 +166,42 @@ class {Domain}(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, index=True)
+    created_at = Column(DateTime, server_default=func.now(), index=True)
 """
 
+# >>>> AQUI: filtros fastapi-filter por dominio
+FILTERS_PY = """\
+from fastapi_filter.contrib.sqlalchemy import Filter
+from .models import {Domain}
+
+class {Domain}Filter(Filter):
+    # ejemplos típicos (extensible según tu modelo):
+    id : int | None = None              # ?id=1
+    id__neq: int | None = None              # ?id__neq=1
+    nombre__ilike: str | None = None       # ?nombre__ilike=juan
+    created_at__gte: str | None = None     # ?created_at__gte=2025-01-01
+    created_at__lte: str | None = None     # ?created_at__lte=2025-12-31
+
+    # orden: ?order_by=-created_at&order_by=nombre
+    order_by: list[str] | None = None
+
+    class Constants(Filter.Constants):
+        model = {Domain}
+"""
+
+# >>>> AQUI: router con GET nativo (FilterDepends) + paginación
 ROUTER_PY = """\
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from ..database import get_db
 from . import models, schemas
+from .filters import {Domain}Filter
+
+from fastapi_filter import FilterDepends
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlalchemy import paginate
 
 router = APIRouter()
 
@@ -178,13 +213,18 @@ def create(payload: schemas.{Domain}Create, db: Session = Depends(get_db)):
     db.refresh(db_obj)
     return db_obj
 
-@router.get("/", response_model=list[schemas.{Domain}Out])
-def list_all(db: Session = Depends(get_db)):
-    return db.query(models.{Domain}).all()
+@router.get("/", response_model=Page[schemas.{Domain}Out])
+def list_all(
+    filtro: {Domain}Filter = FilterDepends({Domain}Filter),
+    db: Session = Depends(get_db),
+):
+    query = filtro.filter(select(models.{Domain}))
+    query = filtro.sort(query)
+    return paginate(db, query)
 
 @router.get("/{{id_}}", response_model=schemas.{Domain}Out)
 def get_one(id_: int, db: Session = Depends(get_db)):
-    obj = db.query(models.{Domain}).get(id_)
+    obj = db.get(models.{Domain}, id_)
     if obj is None:
         raise HTTPException(status_code=404, detail="{Domain} no encontrado")
     return obj
@@ -283,6 +323,7 @@ def create_domain(src_dir: Path, domain_py: str, verbose: bool):
     write_file(domain_dir / "__init__.py", "", verbose)
     write_file(domain_dir / "schemas.py", SCHEMAS_PY.format(Domain=Domain), verbose)
     write_file(domain_dir / "models.py", MODELS_PY.format(Domain=Domain, domain_py=domain_py), verbose)
+    write_file(domain_dir / "filters.py", FILTERS_PY.format(Domain=Domain), verbose)
     write_file(domain_dir / "router.py", ROUTER_PY.format(Domain=Domain), verbose)
 
 def create_api(name: str, domains: List[str], port: int | None, no_compose: bool, force: bool, verbose: bool):

@@ -16,7 +16,6 @@ services:
     depends_on:
       - mozo-y-cliente
     restart: unless-stopped
-
   mozo-y-cliente:
     build:
       context: ../backend/api-mozo-y-cliente
