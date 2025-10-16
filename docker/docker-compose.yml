@@ -27,3 +27,7 @@ services:
     restart: always
     env_file:
       - ../backend/api-mozo-y-cliente/.env
+
+networks:
+  backend:
+    driver: bridge
