@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from ..database import get_db
 from . import models, schemas
@@ -14,11 +15,39 @@ router = APIRouter()
 
 @router.post("/", response_model=schemas.MozoOut)
 def create(payload: schemas.MozoCreate, db: Session = Depends(get_db)):
-    db_obj = models.Mozo(nombre=payload.nombre)
+    db_obj = models.Mozo(nombre=payload.nombre, apellido=payload.apellido, dni=payload.dni, direccion=payload.direccion, telefono=payload.telefono)
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)
     return db_obj
+
+@router.put("/{mozo_id}", response_model=schemas.MozoOut)
+def modify(mozo_id: int, payload: schemas.MozoModify, db: Session = Depends(get_db)):
+    mozo = db.get(models.Mozo, mozo_id)
+    if not mozo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mozo no encontrado")
+
+    data = payload.model_dump(exclude_unset=True)  # solo campos provistos
+    # Si vas a validar DNI único a mano:
+    if "dni" in data and data["dni"] is not None:
+        existe = db.query(models.Mozo).filter(
+            models.Mozo.dni == data["dni"], models.Mozo.id != mozo_id
+        ).first()
+        if existe:
+            raise HTTPException(status_code=409, detail="DNI ya registrado")
+
+    for campo, valor in data.items():
+        setattr(mozo, campo, valor)
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # Por si la unicidad la maneja la BD
+        raise HTTPException(status_code=409, detail="Violación de unicidad (dni)")
+
+    db.refresh(mozo)
+    return mozo
 
 @router.get("/", response_model=Page[schemas.MozoOut])
 def list_all(
