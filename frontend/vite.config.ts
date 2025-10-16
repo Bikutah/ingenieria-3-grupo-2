@@ -6,10 +6,10 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api/mozo-y-cliente': {
-        target: 'http://localhost:8001',
+      '/mozo-y-cliente': {
+        target: 'http://mozo-y-cliente:8000',
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/api\/mozo/, ''),
+        rewrite: (p) => p.replace(/^\/mozo-y-cliente/, ''),
       },
     },
   },
