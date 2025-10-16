@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -26,33 +26,49 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 
-type Mozo = {
-  id: number
-  nombre: string
-  apellido: string
-  telefono: string
-  email: string
-  estado: "Activo" | "Inactivo"
-}
+import type { Mozo as DomainMozo } from "@/services/mozo/types/Mozo"
+import { mozoService } from "@/services/mozo/api/MozoService"
 
-const initialMozos: Mozo[] = [
-  { id: 1, nombre: "Juan", apellido: "Pérez", telefono: "555-0101", email: "juan@boru.com", estado: "Activo" },
-  { id: 2, nombre: "María", apellido: "González", telefono: "555-0102", email: "maria@boru.com", estado: "Activo" },
-  { id: 3, nombre: "Carlos", apellido: "Rodríguez", telefono: "555-0103", email: "carlos@boru.com", estado: "Activo" },
-]
+// Alias para no chocar nombres
+type Mozo = DomainMozo
 
 export default function MozosPage() {
-  const [mozos, setMozos] = useState<Mozo[]>(initialMozos)
+  const [mozos, setMozos] = useState<Mozo[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedMozo, setSelectedMozo] = useState<Mozo | null>(null)
   const [mozoToDelete, setMozoToDelete] = useState<number | null>(null)
-  const [formData, setFormData] = useState({
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // El formulario ahora usa el schema nuevo
+  const [formData, setFormData] = useState<Omit<Mozo, "id">>({
     nombre: "",
     apellido: "",
+    dni: "",
+    direccion: "",
     telefono: "",
-    email: "",
+    activo: true,
   })
+
+  // Cargar lista inicial
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        setLoading(true)
+        const { items } = await mozoService.list({ page: 1, size: 50 })
+        if (mounted) setMozos(items)
+      } catch (e) {
+        console.error("Error cargando mozos:", e)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   const handleOpenDialog = (mozo?: Mozo) => {
     if (mozo) {
@@ -60,37 +76,52 @@ export default function MozosPage() {
       setFormData({
         nombre: mozo.nombre,
         apellido: mozo.apellido,
+        dni: mozo.dni,
+        direccion: mozo.direccion,
         telefono: mozo.telefono,
-        email: mozo.email,
+        activo: mozo.activo,
       })
     } else {
       setSelectedMozo(null)
-      setFormData({ nombre: "", apellido: "", telefono: "", email: "" })
+      setFormData({
+        nombre: "",
+        apellido: "",
+        dni: "",
+        direccion: "",
+        telefono: "",
+        activo: true,
+      })
     }
     setIsDialogOpen(true)
   }
 
-  const handleSave = () => {
-    if (selectedMozo) {
-      // Modificar mozo existente
-      setMozos(mozos.map((m) => (m.id === selectedMozo.id ? { ...m, ...formData } : m)))
-    } else {
-      // Crear nuevo mozo
-      const newMozo: Mozo = {
-        id: Math.max(...mozos.map((m) => m.id)) + 1,
-        ...formData,
-        estado: "Activo",
+  const handleSave = async () => {
+    try {
+      setSaving(true)
+      if (selectedMozo) {
+        const updated = await mozoService.update(selectedMozo.id, formData)
+        setMozos(prev => prev.map(m => (m.id === selectedMozo.id ? updated : m)))
+      } else {
+        const created = await mozoService.create(formData)
+        setMozos(prev => [...prev, created])
       }
-      setMozos([...mozos, newMozo])
+      setIsDialogOpen(false)
+    } catch (e) {
+      console.error("Error guardando mozo:", e)
+    } finally {
+      setSaving(false)
     }
-    setIsDialogOpen(false)
   }
 
-  const handleDelete = () => {
-    if (mozoToDelete) {
-      setMozos(mozos.filter((m) => m.id !== mozoToDelete))
+  const handleDelete = async () => {
+    if (!mozoToDelete) return
+    try {
+      await mozoService.remove(mozoToDelete)
+      setMozos(prev => prev.filter(m => m.id !== mozoToDelete))
       setIsDeleteDialogOpen(false)
       setMozoToDelete(null)
+    } catch (e) {
+      console.error("Error eliminando mozo:", e)
     }
   }
 
@@ -104,7 +135,9 @@ export default function MozosPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Gestión de Mozos</h1>
-          <p className="mt-2 text-muted-foreground">Administra el personal de tu restaurante</p>
+          <p className="mt-2 text-muted-foreground">
+            {loading ? "Cargando..." : "Administra el personal de tu restaurante"}
+          </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -138,6 +171,22 @@ export default function MozosPage() {
                 />
               </div>
               <div className="grid gap-2">
+                <Label htmlFor="dni">DNI</Label>
+                <Input
+                  id="dni"
+                  value={formData.dni}
+                  onChange={(e) => setFormData({ ...formData, dni: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="direccion">Dirección</Label>
+                <Input
+                  id="direccion"
+                  value={formData.direccion}
+                  onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="telefono">Teléfono</Label>
                 <Input
                   id="telefono"
@@ -145,21 +194,14 @@ export default function MozosPage() {
                   onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
                 Cancelar
               </Button>
-              <Button onClick={handleSave}>{selectedMozo ? "Guardar Cambios" : "Crear Mozo"}</Button>
+              <Button onClick={handleSave} disabled={saving}>
+                {selectedMozo ? "Guardar Cambios" : "Crear Mozo"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -172,8 +214,9 @@ export default function MozosPage() {
               <TableHead>ID</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Apellido</TableHead>
+              <TableHead>DNI</TableHead>
               <TableHead>Teléfono</TableHead>
-              <TableHead>Email</TableHead>
+              <TableHead>Dirección</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -184,17 +227,18 @@ export default function MozosPage() {
                 <TableCell className="font-medium">{mozo.id}</TableCell>
                 <TableCell>{mozo.nombre}</TableCell>
                 <TableCell>{mozo.apellido}</TableCell>
+                <TableCell>{mozo.dni}</TableCell>
                 <TableCell>{mozo.telefono}</TableCell>
-                <TableCell>{mozo.email}</TableCell>
+                <TableCell>{mozo.direccion}</TableCell>
                 <TableCell>
                   <span
                     className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      mozo.estado === "Activo"
-                        ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                        : "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
+                      mozo.activo
+                        ? "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400" 
+                        : "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
                     }`}
                   >
-                    {mozo.estado}
+                    {mozo.activo ? "Inactivo" : "Activo"}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
@@ -209,6 +253,13 @@ export default function MozosPage() {
                 </TableCell>
               </TableRow>
             ))}
+            {!loading && mozos.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  No hay mozos cargados.
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
