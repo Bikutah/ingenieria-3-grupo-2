@@ -1,7 +1,7 @@
 import {
   Home,
-  User,
-  Menu,
+  LayoutTemplate,
+  UserPen,
   Users,
   Table,
   Newspaper,
@@ -9,6 +9,9 @@ import {
   Layers,
   NotebookTabs,
   ClipboardList,
+  SquareSquare,
+  Ham,
+  Utensils,
 } from "lucide-react"
 import { Link } from "react-router-dom"
 import {
@@ -31,14 +34,14 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 // Gestiones items.
 const itemsGestiones = [
   {
-    title: "Home",
+    title: "Inicio",
     url: "/",
     icon: Home,
   },
   {
-    title: "Menu",
+    title: "Menús",
     url: "#",
-    icon: Menu,
+    icon: Utensils,
   },
   {
     title: "Clientes",
@@ -48,34 +51,49 @@ const itemsGestiones = [
   {
     title: "Mozos",
     url: "mozos",
-    icon: User,
+    icon: UserPen,
   },
   {
     title: "Mesas",
     url: "#",
     icon: Table,
   },
+  {
+    title: "Sectores",
+    url: "#",
+    icon: SquareSquare,
+  },
+  {
+    title: "Productos",
+    url: "#",
+    icon: Ham,
+  },
+  {
+    title: "Secciones",
+    url: "#",
+    icon: LayoutTemplate,
+  },
 ]
 
 // Funciones items.
 const itemsFunciones = [
   {
-    title: "Crear Reserva",
+    title: "Reservas",
     url: "#",
     icon: NotebookTabs,
   },
   {
-    title: "Crear Comanda",
+    title: "Comandas",
     url: "#",
     icon: ClipboardList,
   },
   {
-    title: "Crear Factura",
+    title: "Facturas",
     url: "#",
     icon: Newspaper,
   },
   {
-    title: "Crear PreTicket",
+    title: "PreTickets",
     url: "#",
     icon: ScrollText,
   },
