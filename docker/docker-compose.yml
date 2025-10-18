@@ -1,3 +1,6 @@
+networks:
+  backend:
+    driver: bridge
 services:
   frontend:
     build:
@@ -39,7 +42,5 @@ services:
       env_file:
         - ../backend/api-gestion-productos/.env
 
-networks:
-  backend:
-    driver: bridge
+
   
