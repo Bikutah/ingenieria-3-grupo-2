@@ -1,0 +1,11 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2
+sqlalchemy
+pydantic-settings
+python-dotenv>=1.0
+httpx>=0.27
+anyio>=4
+pytest>=8
+fastapi-filter==2.0.1
+fastapi-pagination==0.14.3

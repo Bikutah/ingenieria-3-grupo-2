@@ -41,6 +41,14 @@ services:
       restart: always
       env_file:
         - ../backend/api-gestion-productos/.env
-
-
-  
+  gestion-mesas:
+    build:
+      context: ../backend/api-gestion-mesas
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8000"
+    volumes:
+      - ../backend/api-gestion-mesas:/app
+    restart: always
+    env_file:
+      - ../backend/api-gestion-mesas/.env
