@@ -27,7 +27,19 @@ services:
     restart: always
     env_file:
       - ../backend/api-mozo-y-cliente/.env
+  gestion-productos:
+      build:
+        context: ../backend/api-gestion-productos
+        dockerfile: Dockerfile
+      ports:
+        - "8002:8000"
+      volumes:
+        - ../backend/api-gestion-productos:/app
+      restart: always
+      env_file:
+        - ../backend/api-gestion-productos/.env
 
 networks:
   backend:
     driver: bridge
+  
