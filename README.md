@@ -33,6 +33,64 @@
 
 ---
 
+🔧 Inicializador del entorno (inicializador.py)
+
+Este script prepara todas las APIs dentro de backend/ cuyo nombre comience con api-:
+
+Crea o actualiza el archivo .env por servicio con
+DATABASE_URL="sqlite:///./bd-<api>.sqlite3".
+
+Crea el archivo SQLite si no existe (p. ej. bd-mozo-y-cliente.sqlite3).
+
+Genera las tablas automáticamente (via Base.metadata.create_all(engine)), importando todos los paquetes bajo src.* para registrar modelos.
+
+(Opcional) Si detecta Alembic, puede correr alembic upgrade head.
+
+(Opcional) Ejecuta Docker: docker compose build --no-cache y docker compose up -d.
+
+Recomendado: correrlo siempre desde la raíz del repo.
+
+Uso básico
+# Inicializa todas las APIs (env + sqlite + tablas)
+python inicializador.py
+
+Variantes útiles
+# Forzar sobrescribir .env existentes
+python inicializador.py --force
+
+# Limitar a ciertas APIs
+python inicializador.py --services api-mozo-y-cliente api-menu
+
+# No crear el archivo .sqlite (solo .env + tablas)
+python inicializador.py --no-touch-db
+
+# Omitir creación de tablas
+python inicializador.py --no-create-all
+
+# Usar Alembic si hay migraciones (con fallback a create_all si falla)
+python inicializador.py --alembic
+
+Integración con Docker (opcional)
+# Inicializa todo y luego hace build (sin caché) + levanta en segundo plano
+python inicializador.py --docker
+
+
+Opciones Docker:
+
+# Usar un compose específico
+python inicializador.py --docker --compose-file docker/docker-compose.yml
+
+# Build con caché y levantar en primer plano
+python inicializador.py --docker --cache --foreground
+
+# Limitar a servicios del compose y nombrar el proyecto
+python inicializador.py --docker --compose-services frontend mozo-y-cliente --compose-project-name ing3
+
+# Habilitar profiles
+python inicializador.py --docker --profiles dev debug
+
+---
+
 ## 🚧 Arquetipo de APIs (FastAPI + Docker)
 
 Este repo incluye un **scaffolder** (`scaffold_api.py`) que genera APIs de prueba con estructura base (routers por dominio, tests mínimos, Dockerfile) y las **agrega automáticamente al `docker-compose`** con un puerto libre.  
