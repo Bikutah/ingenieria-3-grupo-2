@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import MozosPage from './pages/mozo/MozoPage';
 import { Layout } from './pages/layout/Layout';
 import HomePage from './pages/home/HomePage';
+import ClientePage from './pages/cliente/ClientePage';
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
           {/* La ruta principal "/" se renderizará dentro del Layout */}
           <Route path="/" element={<HomePage />} />
           <Route path="mozos" element={<MozosPage />} />
+          <Route path="clientes" element={<ClientePage />} />
         </Route>
         
         {/* Aquí puedes agregar rutas que no usen el layout del dashboard (ej: Login) */}
