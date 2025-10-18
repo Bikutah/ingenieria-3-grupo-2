@@ -1,9 +1,8 @@
-export type Mozo = {
+export type Cliente = {
   id: number;
   nombre: string;
   apellido: string;
   dni: string;
-  direccion: string;
   telefono: string;
   activo: boolean;
 };

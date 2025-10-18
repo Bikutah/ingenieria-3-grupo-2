@@ -45,7 +45,7 @@ const itemsGestiones = [
   },
   {
     title: "Clientes",
-    url: "#",
+    url: "clientes",
     icon: Users,
   },
   {
