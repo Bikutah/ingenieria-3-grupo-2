@@ -111,9 +111,9 @@ export function AppSidebar() {
               {isCollapsed ? (
                 // --- Versión colapsada ---
                 <div className="flex items-center justify-center py-2">
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-purple-800 overflow-hidden">
+                  <div className="flex aspect-square size-13 items-center justify-center rounded-lg  overflow-hidden">
                     <img
-                      src="/images/bondiolalogo.JPG"
+                      src="/images/bondiola_icon.webp"
                       alt="BondiolitaLaMasRica"
                       className="h-full w-full object-cover"
                     />
@@ -123,9 +123,9 @@ export function AppSidebar() {
                 // --- Versión expandida ---
                 <SidebarMenuButton size="lg" asChild>
                   <a href="/">
-                    <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-purple-800 overflow-hidden">
+                    <div className="flex aspect-square size-13 items-center justify-center rounded-lg overflow-hidden">
                       <img
-                        src="/images/bondiolalogo.JPG"
+                        src="/images/bondiola_icon.webp"
                         alt="BondiolitaLaMasRica"
                         className="h-full w-full object-cover"
                       />
