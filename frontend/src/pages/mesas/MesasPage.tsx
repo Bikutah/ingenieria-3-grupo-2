@@ -44,6 +44,22 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 
+// servicios
+import { sectoresService } from "@/services/sectores/api/SectoresService"
+import type { Sectores } from "@/services/sectores/types/Sectores"
+
+// combobox (shadcn/ui)
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import { ChevronsUpDown, Check } from "lucide-react"
+
 import type { Mesas as DomainMesas } from "@/services/mesas/types/Mesas"
 // si tu servicio exporta como "mozoService" renombralo acá:
 import { mesasService as mesasService } from "@/services/mesas/api/MesasService"
@@ -216,6 +232,58 @@ export default function MesasPage() {
   const parseBoolString = (v?: string) =>
     typeof v === "string" && ["true", "1", "t"].includes(v.toLowerCase())
 
+  // --- Sectores combobox state ---
+  const [sectores, setSectores] = useState<Sectores[]>([])
+  const [sectoresLoading, setSectoresLoading] = useState(false)
+  const [sectorOpen, setSectorOpen] = useState(false)
+  const [sectorQuery, setSectorQuery] = useState("")
+
+  // etiqueta amigable: "Salon principal (#12)"
+  const sectorLabel = (s: Sectores) => `#${s.id} - ${s.numero} · ${s.nombre}`
+
+  // carga sectores activos (con búsqueda opcional)
+  const loadSectores = useCallback(
+    async (q?: string) => {
+      setSectoresLoading(true)
+      try {
+        // prioridad: usar q si tu backend lo soporta globalmente, sino nombre__ilike
+        const params: any = { baja: false, page: 1, size: 50 }
+        if (q && q.trim()) {
+          // si tu API soporta q:
+          params.q = q.trim()
+          // si NO soporta q y querés buscar por nombre, comentá la línea de q y descomentá esta:
+          // params.nombre__ilike = `%${q.trim()}%`
+        }
+        const res = await sectoresService.list(params)
+        setSectores(res.items)
+      } catch (e) {
+        console.error("Error cargando sectores:", e)
+        setSectores([])
+      } finally {
+        setSectoresLoading(false)
+      }
+    },
+    []
+  )
+
+  // Debounce simple para sectorQuery
+  useEffect(() => {
+    const t = setTimeout(() => {
+      // cuando se abre el popover, actualizamos resultados con el query
+      if (sectorOpen) loadSectores(sectorQuery)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [sectorQuery, sectorOpen, loadSectores])
+
+  // Cargar sectores al abrir el diálogo (modo alta/modif)
+  useEffect(() => {
+    if (isDialogOpen) {
+      // precarga inicial (sin query)
+      loadSectores()
+    }
+  }, [isDialogOpen, loadSectores])
+
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -266,14 +334,69 @@ export default function MesasPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="id_sector">Sector (ID)</Label>
-                <Input
-                  id="id_sector"
-                  type="number"
-                  value={formData.id_sector}
-                  onChange={(e) => setFormData({ ...formData, id_sector: e.target.value })}
-                />
+                <Label>Sector (activo)</Label>
+                <Popover open={sectorOpen} onOpenChange={setSectorOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={sectorOpen}
+                      className="w-full justify-between"
+                    >
+                      {(() => {
+                        const selected = sectores.find(s => String(s.id) === String(formData.id_sector))
+                        return selected ? sectorLabel(selected) : "Seleccioná un sector…"
+                      })()}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                    <Command>
+                      <CommandInput
+                        placeholder="Buscar sector por nombre o número…"
+                        value={sectorQuery}
+                        onValueChange={setSectorQuery}
+                      />
+                      <CommandList>
+                        {sectoresLoading ? (
+                          <div className="p-3 text-sm text-muted-foreground">Cargando…</div>
+                        ) : (
+                          <>
+                            <CommandEmpty>No se encontraron sectores</CommandEmpty>
+                            <CommandGroup heading="Resultados">
+                              {sectores.map((s) => {
+                                const selected = String(formData.id_sector) === String(s.id)
+                                return (
+                                  <CommandItem
+                                    key={s.id}
+                                    value={sectorLabel(s)}
+                                    onSelect={() => {
+                                      setFormData({ ...formData, id_sector: String(s.id) })
+                                      setSectorOpen(false)
+                                    }}
+                                  >
+                                    <Check className={`mr-2 h-4 w-4 ${selected ? "opacity-100" : "opacity-0"}`} />
+                                    {sectorLabel(s)}
+                                  </CommandItem>
+                                )
+                              })}
+                            </CommandGroup>
+                          </>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                {/* hint del id seleccionado (útil si el backend espera string numérico) */}
+                {formData.id_sector && (
+                  <p className="text-xs text-muted-foreground">
+                    ID seleccionado: {formData.id_sector}
+                  </p>
+                )}
               </div>
+
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
