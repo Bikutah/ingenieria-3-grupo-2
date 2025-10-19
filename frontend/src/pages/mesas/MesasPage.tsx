@@ -114,6 +114,38 @@ export default function MesasPage() {
     baja: "false",
   })
 
+  // ⬇️ Estado de errores y validación
+  type FormErrors = { numero?: string; cantidad?: string; id_sector?: string; tipo?: string;}
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [isFormValid, setIsFormValid] = useState(false)
+
+  const isBlank = (v?: string) => !v || v.trim() === ""
+
+  const validateForm = (data = formData): boolean => {
+    const errors: FormErrors = {}
+
+    // numero: requerido (no vacío)
+    if (isBlank(data.numero)) errors.numero = "El número es obligatorio."
+
+    // cantidad: entero >= 1
+    const n = Number(data.cantidad)
+    if (isBlank(data.cantidad)) {
+      errors.cantidad = "La cantidad de sillas es obligatoria."
+    } else if (!Number.isInteger(n) || n < 1) {
+      errors.cantidad = "Debe ser un entero mayor o igual a 1."
+    }
+
+    if (isBlank(data.tipo)) errors.tipo = "El tipo es obligatorio."
+
+    // sector: requerido
+    if (isBlank(data.id_sector)) errors.id_sector = "Seleccioná un sector."
+
+    setFormErrors(errors)
+    setIsFormValid(Object.keys(errors).length === 0)
+    return Object.keys(errors).length === 0
+  }
+
+
   const [filters, setFilters] = useState<Omit<MesasListParams, "page" | "size">>(DEFAULT_FILTERS)
 
   const normalizeOrderBy = (v?: string): string[] | undefined => (v ? [v] : undefined)
@@ -144,27 +176,27 @@ export default function MesasPage() {
 
   useEffect(() => {
     let mounted = true
-    ;(async () => {
-      setLoading(true)
-      try {
-        const data = await mesasService.list({
-          page: 1,
-          size: PAGE_SIZE,
-          ...filters,
-          order_by: normalizeOrderBy(filters.order_by),
-        } as any)
-        if (!mounted) return
-        setMesas(data.items)
-        setTotal(data.total ?? 0)
-        setPage(data.page ?? 1)
-        setPages(data.pages)
-        setSize(data.size ?? PAGE_SIZE)
-      } catch (e) {
-        console.error("Error cargando mesas:", e)
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    })()
+      ; (async () => {
+        setLoading(true)
+        try {
+          const data = await mesasService.list({
+            page: 1,
+            size: PAGE_SIZE,
+            ...filters,
+            order_by: normalizeOrderBy(filters.order_by),
+          } as any)
+          if (!mounted) return
+          setMesas(data.items)
+          setTotal(data.total ?? 0)
+          setPage(data.page ?? 1)
+          setPages(data.pages)
+          setSize(data.size ?? PAGE_SIZE)
+        } catch (e) {
+          console.error("Error cargando mesas:", e)
+        } finally {
+          if (mounted) setLoading(false)
+        }
+      })()
     return () => {
       mounted = false
     }
@@ -195,6 +227,8 @@ export default function MesasPage() {
   }
 
   const handleSave = async () => {
+    if (!validateForm()) return
+
     try {
       setSaving(true)
       if (selectedMesa) {
@@ -211,6 +245,7 @@ export default function MesasPage() {
       setSaving(false)
     }
   }
+
 
   const handleDelete = async () => {
     if (!mesaToDelete) return
@@ -283,6 +318,10 @@ export default function MesasPage() {
     }
   }, [isDialogOpen, loadSectores])
 
+  useEffect(() => {
+    validateForm()
+  }, [formData])
+
 
   return (
     <div className="space-y-6">
@@ -308,40 +347,63 @@ export default function MesasPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+
+              {/* Número */}
               <div className="grid gap-2">
                 <Label htmlFor="numero">Número</Label>
                 <Input
                   id="numero"
                   value={formData.numero}
                   onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                  aria-invalid={!!formErrors.numero}
                 />
+                {formErrors.numero && (
+                  <p className="text-xs text-destructive">{formErrors.numero}</p>
+                )}
               </div>
+
+              {/* Tipo (opcional, sin validación por ahora) */}
               <div className="grid gap-2">
                 <Label htmlFor="tipo">Tipo</Label>
                 <Input
                   id="tipo"
                   value={formData.tipo}
                   onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                  aria-invalid={!!formErrors.tipo}
                 />
+                {formErrors.tipo && (
+                  <p className="text-xs text-destructive">{formErrors.tipo}</p>
+                )}
               </div>
+
+              {/* Cantidad de sillas */}
               <div className="grid gap-2">
                 <Label htmlFor="cantidad">Cantidad de sillas</Label>
                 <Input
                   id="cantidad"
                   type="number"
+                  min={1}
+                  step={1}
                   value={formData.cantidad}
                   onChange={(e) => setFormData({ ...formData, cantidad: e.target.value })}
+                  aria-invalid={!!formErrors.cantidad}
                 />
+                {formErrors.cantidad && (
+                  <p className="text-xs text-destructive">{formErrors.cantidad}</p>
+                )}
               </div>
+
+              {/* Sector (combobox) */}
               <div className="grid gap-2">
                 <Label>Sector (activo)</Label>
                 <Popover open={sectorOpen} onOpenChange={setSectorOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
-                      variant="outline"
+                      variant={formErrors.id_sector ? "destructive" : "outline"}
                       role="combobox"
                       aria-expanded={sectorOpen}
+                      aria-invalid={!!formErrors.id_sector}
                       className="w-full justify-between"
                     >
                       {(() => {
@@ -352,44 +414,46 @@ export default function MesasPage() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                    <Command>
-                      <CommandInput
-                        placeholder="Buscar sector por nombre o número…"
-                        value={sectorQuery}
-                        onValueChange={setSectorQuery}
-                      />
-                      <CommandList>
-                        {sectoresLoading ? (
-                          <div className="p-3 text-sm text-muted-foreground">Cargando…</div>
-                        ) : (
-                          <>
-                            <CommandEmpty>No se encontraron sectores</CommandEmpty>
-                            <CommandGroup heading="Resultados">
-                              {sectores.map((s) => {
-                                const selected = String(formData.id_sector) === String(s.id)
-                                return (
-                                  <CommandItem
-                                    key={s.id}
-                                    value={sectorLabel(s)}
-                                    onSelect={() => {
-                                      setFormData({ ...formData, id_sector: String(s.id) })
-                                      setSectorOpen(false)
-                                    }}
-                                  >
-                                    <Check className={`mr-2 h-4 w-4 ${selected ? "opacity-100" : "opacity-0"}`} />
-                                    {sectorLabel(s)}
-                                  </CommandItem>
-                                )
-                              })}
-                            </CommandGroup>
-                          </>
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
+                      <Command>
+                        <CommandInput
+                          placeholder="Buscar sector por nombre o número…"
+                          value={sectorQuery}
+                          onValueChange={setSectorQuery}
+                        />
+                        <CommandList>
+                          {sectoresLoading ? (
+                            <div className="p-3 text-sm text-muted-foreground">Cargando…</div>
+                          ) : (
+                            <>
+                              <CommandEmpty>No se encontraron sectores</CommandEmpty>
+                              <CommandGroup heading="Resultados">
+                                {sectores.map((s) => {
+                                  const selected = String(formData.id_sector) === String(s.id)
+                                  return (
+                                    <CommandItem
+                                      key={s.id}
+                                      value={String(s.id)}
+                                      onSelect={() => {
+                                        setFormData({ ...formData, id_sector: String(s.id) })
+                                        setSectorOpen(false)
+                                      }}
+                                    >
+                                      <Check className={`mr-2 h-4 w-4 ${selected ? "opacity-100" : "opacity-0"}`} />
+                                      {`#${s.id} - ${s.numero} · ${s.nombre}`}
+                                    </CommandItem>
+                                  )
+                                })}
+                              </CommandGroup>
+                            </>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
                 </Popover>
+                {formErrors.id_sector && (
+                  <p className="text-xs text-destructive">{formErrors.id_sector}</p>
+                )}
 
-                {/* hint del id seleccionado (útil si el backend espera string numérico) */}
                 {formData.id_sector && (
                   <p className="text-xs text-muted-foreground">
                     ID seleccionado: {formData.id_sector}
@@ -397,12 +461,13 @@ export default function MesasPage() {
                 )}
               </div>
 
+
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
                 Cancelar
               </Button>
-              <Button onClick={handleSave} disabled={saving}>
+              <Button onClick={handleSave} disabled={saving || !isFormValid}>
                 {selectedMesa ? "Guardar Cambios" : "Crear Mesa"}
               </Button>
             </DialogFooter>
@@ -592,11 +657,10 @@ export default function MesasPage() {
                   <TableCell>{mesa.id_sector}</TableCell>
                   <TableCell>
                     <span
-                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                        isBaja
+                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${isBaja
                           ? "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
                           : "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                      }`}
+                        }`}
                     >
                       {isBaja ? "Baja" : "Activa"}
                     </span>
