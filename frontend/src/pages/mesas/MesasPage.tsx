@@ -63,6 +63,8 @@ import { ChevronsUpDown, Check } from "lucide-react"
 import type { Mesas as DomainMesas } from "@/services/mesas/types/Mesas"
 // si tu servicio exporta como "mozoService" renombralo acá:
 import { mesasService as mesasService } from "@/services/mesas/api/MesasService"
+import { toast } from "sonner"
+import { extractApiErrorMessage } from "@/lib/api-error"
 
 type Mesas = DomainMesas
 
@@ -226,25 +228,33 @@ export default function MesasPage() {
     setIsDialogOpen(true)
   }
 
-  const handleSave = async () => {
-    if (!validateForm()) return
-
-    try {
-      setSaving(true)
-      if (selectedMesa) {
-        const updated = await mesasService.update(selectedMesa.id, formData)
-        setMesas((prev) => prev.map((m) => (m.id === selectedMesa.id ? updated : m)))
-      } else {
-        const created = await mesasService.create(formData)
-        setMesas((prev) => [...prev, created])
-      }
-      setIsDialogOpen(false)
-    } catch (e) {
-      console.error("Error guardando mesa:", e)
-    } finally {
-      setSaving(false)
-    }
+const handleSave = async () => {
+  if (!validateForm()) {
+    toast.error("Faltan datos", { description: "Revisá los campos marcados." })
+    return
   }
+
+  setSaving(true)
+  try {
+    if (selectedMesa) {
+      const updated = await mesasService.update(selectedMesa.id, formData)
+      setMesas(prev => prev.map(m => (m.id === selectedMesa.id ? updated : m)))
+      toast.success("Mesa actualizada", { description: `#${updated?.id ?? selectedMesa.id}` })
+    } else {
+      const created = await mesasService.create(formData)
+      setMesas(prev => [...prev, created])
+      toast.success("Mesa creada", { description: `#${created?.id ?? "?"}` })
+    }
+    setIsDialogOpen(false)
+  } catch (e) {
+    // opcional: mapear errores de campos si viene detail[]
+    // setFormErrors(mapFieldErrors(e?.response?.data?.detail))
+    toast.error("No se pudo guardar", { description: extractApiErrorMessage(e) })
+    console.error(e)
+  } finally {
+    setSaving(false)
+  }
+}
 
 
   const handleDelete = async () => {
