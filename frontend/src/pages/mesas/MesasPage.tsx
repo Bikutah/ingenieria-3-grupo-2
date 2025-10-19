@@ -46,7 +46,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react"
 
 import type { Mesas as DomainMesas } from "@/services/mesas/types/Mesas"
 // si tu servicio exporta como "mozoService" renombralo acá:
-import { mozoService as mesasService } from "@/services/mesas/api/MesasService"
+import { mesasService as mesasService } from "@/services/mesas/api/MesasService"
 
 type Mesas = DomainMesas
 

@@ -39,11 +39,6 @@ const itemsGestiones = [
     icon: Home,
   },
   {
-    title: "Menús",
-    url: "#",
-    icon: Utensils,
-  },
-  {
     title: "Clientes",
     url: "clientes",
     icon: Users,
@@ -91,11 +86,6 @@ const itemsFunciones = [
     title: "Facturas",
     url: "#",
     icon: Newspaper,
-  },
-  {
-    title: "PreTickets",
-    url: "#",
-    icon: ScrollText,
   },
 ]
 
