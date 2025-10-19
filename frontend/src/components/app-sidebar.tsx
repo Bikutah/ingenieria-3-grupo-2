@@ -55,12 +55,12 @@ const itemsGestiones = [
   },
   {
     title: "Mesas",
-    url: "#",
+    url: "mesas",
     icon: Table,
   },
   {
     title: "Sectores",
-    url: "#",
+    url: "sectores",
     icon: SquareSquare,
   },
   {

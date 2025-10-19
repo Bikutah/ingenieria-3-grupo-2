@@ -13,6 +13,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/mozo-y-cliente/, ''),
       },
+        '/gestion-mesas': {
+        target: 'http://gestion-mesas:8000',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/gestion-mesas/, ''),
+      },
     },
   },
   resolve: {
