@@ -47,6 +47,9 @@ import { Plus, Pencil, Trash2 } from "lucide-react"
 import type { Sectores as DomainSector } from "@/services/sectores/types/Sectores"
 import { sectoresService } from "@/services/sectores/api/SectoresService"
 
+import { toast } from "sonner"
+import { extractApiErrorMessage } from "@/lib/api-error"
+
 type Sector = DomainSector
 const PAGE_SIZE = 50
 
@@ -86,6 +89,7 @@ export default function SectoresPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
+
   // Form de Sector (usa tu tipo: nombre, numero, baja:boolean)
   const [formData, setFormData] = useState<Omit<Sector, "id">>({
     nombre: "",
@@ -96,6 +100,51 @@ export default function SectoresPage() {
   const [filters, setFilters] = useState<Omit<SectoresListParamsUI, "page" | "size">>(DEFAULT_FILTERS)
 
   const normalizeOrderBy = (v?: string): string[] | undefined => (v ? [v] : undefined)
+
+      //Errores
+  // --- state y helpers ---
+  type FormErrors = {
+    nombre?: string;
+    numero?: string;
+  };
+
+  type Touched = Partial<Record<keyof FormErrors, boolean>>;
+
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [isFormValid, setIsFormValid] = useState(false);
+  const [touched, setTouched] = useState<Touched>({});
+
+  // helpers
+  const toStringSafe = (v: unknown) => (typeof v === "string" ? v : String(v ?? ""));
+  const isBlank = (v?: unknown) => toStringSafe(v).trim() === "";
+
+  // Validación general
+  const validateForm = (data = formData): boolean => {
+    const errors: FormErrors = {};
+
+    const nombre = toStringSafe(data.nombre).trim();
+    const numero = toStringSafe(data.numero).trim();
+
+    if (!nombre) errors.nombre = "El nombre es obligatorio.";
+    if (!numero) errors.numero = "El numero es obligatorio.";
+
+    setFormErrors(errors);
+    const ok = Object.keys(errors).length === 0;
+    setIsFormValid(ok);
+    return ok;
+  };
+
+  // Revalidar en vivo al cambiar formData
+  useEffect(() => {
+    validateForm(formData);
+  }, [formData]);
+
+  // marcar touched
+  const markTouched = (key: keyof Touched) =>
+    setTouched((t) => ({ ...t, [key]: true }));
+
+  // clase de error simple (si usás shadcn, funciona bien sumando esta clase)
+  const errorClass = "border-red-500 focus-visible:ring-red-500";
 
   const loadPage = useCallback(
     async (p: number, s = size) => {
@@ -187,13 +236,16 @@ export default function SectoresPage() {
       if (selectedSector) {
         const updated = await sectoresService.update(selectedSector.id, formData)
         setSectores((prev) => prev.map((s) => (s.id === selectedSector.id ? updated : s)))
+        toast.success("Sector actualizado", { description: `#${updated?.id ?? selectedSector.id}` })
       } else {
         const created = await sectoresService.create(formData)
         setSectores((prev) => [...prev, created])
+        toast.success("Sector creado", { description: `#${created?.id ?? "?"}` })
       }
       setIsDialogOpen(false)
     } catch (e) {
-      console.error("Error guardando sector:", e)
+      toast.error("No se pudo guardar", { description: extractApiErrorMessage(e) })
+      console.error(e)
     } finally {
       setSaving(false)
     }
@@ -239,29 +291,46 @@ export default function SectoresPage() {
                 {selectedSector ? "Modifica los datos del sector" : "Completa los datos del nuevo sector"}
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
+ <div className="grid gap-4 py-4">
+              {/* Nombre */}
+              <div className="grid gap-1.5">
                 <Label htmlFor="nombre">Nombre</Label>
                 <Input
                   id="nombre"
                   value={formData.nombre}
                   onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                  onBlur={() => markTouched("nombre")}
+                  aria-invalid={!!(touched.nombre && formErrors.nombre)}
+                  aria-describedby={touched.nombre && formErrors.nombre ? "nombre-error" : undefined}
+                  className={touched.nombre && formErrors.nombre ? errorClass : undefined}
                 />
+                {touched.nombre && formErrors.nombre && (
+                  <p id="nombre-error" className="text-sm text-red-600">{formErrors.nombre}</p>
+                )}
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="numero">Número</Label>
+
+              {/* numero */}
+              <div className="grid gap-1.5">
+                <Label htmlFor="numero">Numero</Label>
                 <Input
                   id="numero"
                   value={formData.numero}
                   onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                  onBlur={() => markTouched("numero")}
+                  aria-invalid={!!(touched.numero && formErrors.numero)}
+                  aria-describedby={touched.numero && formErrors.numero ? "numero-error" : undefined}
+                  className={touched.numero && formErrors.numero ? errorClass : undefined}
                 />
+                {touched.numero && formErrors.numero && (
+                  <p id="numero-error" className="text-sm text-red-600">{formErrors.numero}</p>
+                )}
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
                 Cancelar
               </Button>
-              <Button onClick={handleSave} disabled={saving}>
+              <Button onClick={handleSave} disabled={saving || !isFormValid}>
                 {selectedSector ? "Guardar Cambios" : "Crear Sector"}
               </Button>
             </DialogFooter>
