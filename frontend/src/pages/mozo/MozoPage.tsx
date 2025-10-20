@@ -117,7 +117,6 @@ export default function MozosPage() {
 
   // helpers
   const toStringSafe = (v: unknown) => (typeof v === "string" ? v : String(v ?? ""));
-  const isBlank = (v?: unknown) => toStringSafe(v).trim() === "";
 
   // DNI AR: 7–8 dígitos (con o sin puntos)
   const isValidDNI = (v: string) => {

@@ -114,6 +114,8 @@ export default function MesasPage() {
     baja: "false",
   })
 
+  const toStringSafe = (v: unknown) => (typeof v === "string" ? v : String(v ?? ""));
+
   // ⬇️ Estado de errores y validación
   type FormErrors = { numero?: string; cantidad?: string; id_sector?: string; tipo?: string }
   type Touched = Partial<Record<keyof FormErrors, boolean>>
@@ -123,27 +125,30 @@ export default function MesasPage() {
   const [touched, setTouched] = useState<Touched>({})
   const [submitted, setSubmitted] = useState(false)
 
-  const isBlank = (v?: string) => !v || v.trim() === ""
-
   const validateForm = (data = formData): boolean => {
     const errors: FormErrors = {}
 
+    const numero = toStringSafe(data.numero).trim();
+    const cantidad = toStringSafe(data.cantidad).trim();
+    const tipo = toStringSafe(data.tipo).trim();
+    const id_sector = toStringSafe(data.id_sector).trim();
+
     // numero: requerido
-    if (isBlank(data.numero)) errors.numero = "El número es obligatorio."
+    if (!numero) errors.numero = "El número es obligatorio."
 
     // cantidad: entero >= 1
-    const n = Number(data.cantidad)
-    if (isBlank(data.cantidad)) {
+    const n = Number(cantidad)
+    if (!cantidad) {
       errors.cantidad = "La cantidad de sillas es obligatoria."
     } else if (!Number.isInteger(n) || n < 1) {
       errors.cantidad = "Debe ser un entero mayor o igual a 1."
     }
 
     // tipo: requerido (si es opcional, eliminá esta regla)
-    if (isBlank(data.tipo)) errors.tipo = "El tipo es obligatorio."
+    if (!tipo) errors.tipo = "El tipo es obligatorio."
 
     // sector: requerido
-    if (isBlank(data.id_sector)) errors.id_sector = "Seleccioná un sector."
+    if (!id_sector) errors.id_sector = "Seleccioná un sector."
 
     setFormErrors(errors)
     const ok = Object.keys(errors).length === 0
