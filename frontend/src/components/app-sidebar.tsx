@@ -65,7 +65,7 @@ const itemsGestiones = [
   },
   {
     title: "Productos",
-    url: "#",
+    url: "productos",
     icon: Ham,
   },
   {
