@@ -4,5 +4,5 @@ export type Cliente = {
   apellido: string;
   dni: string;
   telefono: string;
-  activo: boolean;
+  baja: boolean;
 };

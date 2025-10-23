@@ -70,7 +70,7 @@ export default function ClientePage() {
     apellido: "",
     dni: "",
     telefono: "",
-    activo: true,
+    baja: null,
   })
 
   type ListParams = {
@@ -82,7 +82,6 @@ export default function ClientePage() {
   nombre__ilike?: string
   apellido__ilike?: string
   dni__ilike?: string
-  direccion__ilike?: string
   baja?: boolean
   order_by?: string
   }
@@ -146,7 +145,7 @@ export default function ClientePage() {
         apellido: cliente.apellido,
         dni: cliente.dni,
         telefono: cliente.telefono,
-        activo: cliente.activo,
+        baja: cliente.baja,
       })
     } else {
       setSelectedCliente(null)
@@ -155,7 +154,7 @@ export default function ClientePage() {
         apellido: "",
         dni: "",
         telefono: "",
-        activo: true,
+        baja: true,
       })
     }
     setIsDialogOpen(true)
@@ -337,20 +336,7 @@ export default function ClientePage() {
             />
           </div>
 
-          {/* direccion__ilike */}
-          <div className="grid gap-2">
-            <Label htmlFor="dir_ilike">Dirección ~</Label>
-            <Input
-              id="dir_ilike"
-              placeholder="Contiene..."
-              value={filters.direccion__ilike ?? ""}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, direccion__ilike: e.target.value || undefined }))
-              }
-            />
-          </div>
-
-                  {/* Estado (baja) */}
+          {/* Estado (baja) */}
           <div className="grid gap-2">
             <Label>Estado</Label>
             <Select
@@ -435,7 +421,6 @@ export default function ClientePage() {
               <TableHead>Apellido</TableHead>
               <TableHead>DNI</TableHead>
               <TableHead>Teléfono</TableHead>
-              <TableHead>Dirección</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -451,12 +436,12 @@ export default function ClientePage() {
                 <TableCell>
                   <span
                     className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      cliente.activo
+                      cliente.baja
                         ? "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400" 
                         : "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
                     }`}
                   >
-                    {cliente.activo ? "Inactivo" : "Activo"}
+                    {cliente.baja ? "Inactivo" : "Activo"}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
