@@ -5,20 +5,21 @@ const DEFAULT_BASE = "/gestion-productos";
 
 export const productoService = {
   
-  async list(params: { q?: string; page?: number; size?: number; id?: number, id__neq?: number, tipo__ilike?: string, nombre__ilike?: string, precio__ilike?: number, descripcion__ilike?: string, cm3__ilike?: number, baja?: boolean, order_by?: string }) {
+  async list(params: { q?: string; page?: number; size?: number; id?: number, tipo: string, nombre__ilike?: string, precio__gte?: number, precio__lte?: number, baja?: boolean, order_by?: string }) {
     const res = await request<{ items: Producto[]; total: number; pages: number; size: number; page: number }>({
       method: "GET",
-      url: "/producto/",
+      url: "/productos/",
       params,
       baseURL: DEFAULT_BASE,
     });
+    console.log("Respuesta_", res.data);
     return { items: res.data.items, total: res.data.total, page: res.data.page, pages: res.data.pages, size: res.data.size };
   },
 
   async getById(id: number) {
     const res = await request<Producto>({
       method: "GET",
-      url: `/producto/${id}`,
+      url: `/productos/${id}`,
       baseURL: DEFAULT_BASE,
     });
     return res.data;
@@ -27,7 +28,7 @@ export const productoService = {
   async create(data: Omit<Producto, "id">) {
     const res = await request<Producto>({
       method: "POST",
-      url: "/producto/",
+      url: "/productos/",
       data,
       baseURL: DEFAULT_BASE,
     });
@@ -37,7 +38,7 @@ export const productoService = {
   async update(id: number, data: Partial<Omit<Producto, "id">>) {
     const res = await request<Producto>({
       method: "PUT",
-      url: `/producto/${id}`,
+      url: `/productos/${id}`,
       data,
       baseURL: DEFAULT_BASE,
     });
@@ -47,7 +48,7 @@ export const productoService = {
   async remove(id: number) {
     await request({
       method: "DELETE",
-      url: `/producto/${id}`,
+      url: `/productos/${id}`,
       baseURL: DEFAULT_BASE,
     });
   },

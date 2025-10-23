@@ -18,6 +18,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/gestion-mesas/, ''),
       },
+      '/gestion-productos': {
+        target: 'http://gestion-productos:8000',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/gestion-productos/, ''),
+      },
     },
   },
   resolve: {

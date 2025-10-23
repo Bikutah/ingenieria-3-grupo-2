@@ -84,10 +84,11 @@ export default function ProductoPage() {
 
   const [formData, setFormData] = useState<Omit<Producto, "id">>({
     nombre: "",
+    tipo: "",
     precio: "",
     descripcion: "",
     cm3: "",
-    activo: true,
+    baja: false,
   })
   
   type ListParams = {
@@ -172,7 +173,7 @@ export default function ProductoPage() {
         nombre: "",
         precio: "",
         descripcion: "",
-        cm3: "",
+        cm3: null,
         activo: true,
       })
     }
@@ -282,7 +283,7 @@ export default function ProductoPage() {
 					  value={formData.descripcion}
 					  onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
 					/>
-				  {formData.tipo === "Bebida" && (
+				  {formData.tipo === "bebida" && (
 					  <div className="grid gap-2">
 						<Label htmlFor="cm3">cm3</Label>
 						<Input
