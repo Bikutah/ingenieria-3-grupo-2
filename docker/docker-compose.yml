@@ -1,0 +1,54 @@
+networks:
+  backend:
+    driver: bridge
+services:
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "5174:5173"   # accedés en http://localhost:5174
+    volumes:
+      - ../frontend:/app:cached   # tu código en vivo
+      - /app/node_modules        # evita pisar node_modules
+    environment:
+      # En Mac/Windows (Docker Desktop) mejora la detección de cambios
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    depends_on:
+      - mozo-y-cliente
+    restart: unless-stopped
+  mozo-y-cliente:
+    build:
+      context: ../backend/api-mozo-y-cliente
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    volumes:
+      - ../backend/api-mozo-y-cliente:/app
+    restart: always
+    env_file:
+      - ../backend/api-mozo-y-cliente/.env
+  gestion-productos:
+      build:
+        context: ../backend/api-gestion-productos
+        dockerfile: Dockerfile
+      ports:
+        - "8002:8000"
+      volumes:
+        - ../backend/api-gestion-productos:/app
+      restart: always
+      env_file:
+        - ../backend/api-gestion-productos/.env
+  gestion-mesas:
+    build:
+      context: ../backend/api-gestion-mesas
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8000"
+    volumes:
+      - ../backend/api-gestion-mesas:/app
+    restart: always
+    env_file:
+      - ../backend/api-gestion-mesas/.env

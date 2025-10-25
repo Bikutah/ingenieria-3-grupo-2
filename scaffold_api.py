@@ -21,28 +21,114 @@ TEMPLATES_DIR = DOCKER_DIR / "templates"
 COMPOSE_FILE = DOCKER_DIR / "docker-compose.yml"
 
 # =========================
-# Templates en código (solo Dockerfile y código app)
+# Templates en código
 # =========================
-DOCKERFILE = """\
-FROM python:3.12-slim
+GITIGNORE_CONTENT = """\
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# C extensions
+*.so
 
-WORKDIR /app
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak
+venv.bak
 
-COPY . .
+# SQLite databases
+*.sqlite3
 
-EXPOSE 8000
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# IDEs and editors
+.idea/
+.vscode/
+
+# Pytest
+.pytest_cache/
 """
 
+CONFIG_PY = """\
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    database_url: str
+    model_config = SettingsConfigDict(env_file=".env")
+
+settings = Settings()
+"""
+
+DATABASE_PY = """\
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from .config import settings
+
+engine = create_engine(
+    settings.database_url,
+    connect_args={"check_same_thread": False}, # Necesario para SQLite
+)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+# Dependency para inyectar la sesión de la BD en los endpoints
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+"""
+
+DOCKERFILE = """\
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "src.main:app", "--reload", "--host", "0.0.0.0","--port", "8000"]
+"""
+
+# >>>> AQUI: main con add_pagination
 MAIN_PY = """\
 from fastapi import FastAPI
+from .database import engine
+{model_imports}
 {imports}
+
+# Crea las tablas en la base de datos (si no existen)
+{create_tables}
+
+from fastapi_pagination import add_pagination
 
 app = FastAPI(title="{app_title}")
 
@@ -51,116 +137,97 @@ def health():
     return {{"status": "ok", "service": "{service_key}"}}
 
 {includes}
-"""
 
-CONSTANTS_PY = """\
-DEFAULT_LIMIT = 50
-"""
-
-EXCEPTIONS_PY = """\
-class {Domain}NotFoundError(Exception):
-    \"\"\"Se dispara cuando no se encuentra un recurso de {domain}.\"\"\"
-    pass
+# activa paginación (page/size en Swagger)
+add_pagination(app)
 """
 
 SCHEMAS_PY = """\
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
-class {Domain}Create(BaseModel):
+class {Domain}Base(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=100)
 
-class {Domain}Out(BaseModel):
+class {Domain}Create({Domain}Base):
+    pass
+
+class {Domain}Out({Domain}Base):
     id: int
-    nombre: str
+    model_config = ConfigDict(from_attributes=True) # Permite que Pydantic lea desde objetos ORM
 """
 
+# >>>> AQUI: modelo con created_at opcional (útil para ordenar/filtrar). Si no lo querés, podés quitarlo.
 MODELS_PY = """\
-class {Domain}:
-    def __init__(self, id: int, nombre: str):
-        self.id = id
-        self.nombre = nombre
+from sqlalchemy import Column, Integer, String, DateTime, func
+from ..database import Base
+
+class {Domain}(Base):
+    __tablename__ = "{domain_py}s" # Nombre de la tabla
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String, index=True)
+    created_at = Column(DateTime, server_default=func.now(), index=True)
 """
 
-SERVICES_PY = """\
+# >>>> AQUI: filtros fastapi-filter por dominio
+FILTERS_PY = """\
+from fastapi_filter.contrib.sqlalchemy import Filter
 from .models import {Domain}
-from .exceptions import {Domain}NotFoundError
 
-_DB = {{}}
-_SEQ = 0
+class {Domain}Filter(Filter):
+    # ejemplos típicos (extensible según tu modelo):
+    id : int | None = None              # ?id=1
+    id__neq: int | None = None              # ?id__neq=1
+    nombre__ilike: str | None = None       # ?nombre__ilike=juan
+    created_at__gte: str | None = None     # ?created_at__gte=2025-01-01
+    created_at__lte: str | None = None     # ?created_at__lte=2025-12-31
 
-def create_{domain}(nombre: str) -> {Domain}:
-    global _SEQ
-    _SEQ += 1
-    inst = {Domain}(_SEQ, nombre)
-    _DB[_SEQ] = inst
-    return inst
+    # orden: ?order_by=-created_at&order_by=nombre
+    order_by: list[str] | None = None
 
-def list_{domain}s(limit: int = 50) -> list[{Domain}]:
-    return list(_DB.values())[:limit]
-
-def get_{domain}(id_: int) -> {Domain}:
-    if id_ not in _DB:
-        raise {Domain}NotFoundError()
-    return _DB[id_]
+    class Constants(Filter.Constants):
+        model = {Domain}
 """
 
+# >>>> AQUI: router con GET nativo (FilterDepends) + paginación
 ROUTER_PY = """\
-from fastapi import APIRouter, HTTPException, Query
-from .schemas import {Domain}Create, {Domain}Out
-from .services import create_{domain}, list_{domain}s, get_{domain}
-from .exceptions import {Domain}NotFoundError
-from .constants import DEFAULT_LIMIT
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import select
+
+from ..database import get_db
+from . import models, schemas
+from .filters import {Domain}Filter
+
+from fastapi_filter import FilterDepends
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlalchemy import paginate
 
 router = APIRouter()
 
-@router.post("/", response_model={Domain}Out)
-def create(payload: {Domain}Create):
-    obj = create_{domain}(payload.nombre)
-    return {{"id": obj.id, "nombre": obj.nombre}}
+@router.post("/", response_model=schemas.{Domain}Out)
+def create(payload: schemas.{Domain}Create, db: Session = Depends(get_db)):
+    db_obj = models.{Domain}(nombre=payload.nombre)
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
 
-@router.get("/", response_model=list[{Domain}Out])
-def list_all(limit: int = Query(DEFAULT_LIMIT, ge=1, le=500)):
-    objs = list_{domain}s(limit=limit)
-    return [{{"id": o.id, "nombre": o.nombre}} for o in objs]
+@router.get("/", response_model=Page[schemas.{Domain}Out])
+def list_all(
+    filtro: {Domain}Filter = FilterDepends({Domain}Filter),
+    db: Session = Depends(get_db),
+):
+    query = filtro.filter(select(models.{Domain}))
+    query = filtro.sort(query)
+    return paginate(db, query)
 
-@router.get("/{{id_}}", response_model={Domain}Out)
-def get_one(id_: int):
-    try:
-        o = get_{domain}(id_)
-        return {{"id": o.id, "nombre": o.nombre}}
-    except {Domain}NotFoundError:
+@router.get("/{{id_}}", response_model=schemas.{Domain}Out)
+def get_one(id_: int, db: Session = Depends(get_db)):
+    obj = db.get(models.{Domain}, id_)
+    if obj is None:
         raise HTTPException(status_code=404, detail="{Domain} no encontrado")
-"""
-
-TEST_MAIN = """\
-from httpx import AsyncClient
-from src.main import app
-import pytest
-
-@pytest.mark.anyio
-async def test_health_ok():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
-        resp = await ac.get("/health")
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
-"""
-
-TEST_DOMAIN = """\
-from httpx import AsyncClient
-from src.main import app
-import pytest
-
-@pytest.mark.anyio
-async def test_{domain}_crud():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
-        r = await ac.post("/{domain}/", json={{"nombre": "ejemplo"}})
-        assert r.status_code == 200
-        data = r.json()
-        r = await ac.get("/{domain}/")
-        assert r.status_code == 200
-        assert len(r.json()) >= 1
-        r = await ac.get(f"/{domain}/{{data['id']}}")
-        assert r.status_code == 200
+    return obj
 """
 
 COMPOSE_SERVICE_TEMPLATE = """\
@@ -173,6 +240,8 @@ COMPOSE_SERVICE_TEMPLATE = """\
     volumes:
       - ../backend/{api_dir}:/app
     restart: always
+    env_file:
+      - ../backend/{api_dir}/.env
 """
 
 # =========================
@@ -183,7 +252,6 @@ def log(msg: str, verbose: bool):
         print(msg)
 
 def sanitize_name(name: str) -> str:
-    # Normaliza: minúsculas, alfanumérico y guiones
     n = name.strip().lower()
     n = re.sub(r"[^a-z0-9-]+", "-", n)
     n = re.sub(r"-+", "-", n).strip("-")
@@ -204,18 +272,7 @@ def read_text(path: Path) -> str:
         raise FileNotFoundError(f"No se encontró el template requerido: {path}")
     return path.read_text(encoding="utf-8")
 
-def render_template(path: Path, **kwargs) -> str:
-    """
-    Lee un template y aplica .format(**kwargs).
-    Si el template contiene llaves literales { }, escapalas como {{ }}.
-    """
-    text = read_text(path)
-    try:
-        return text.format(**kwargs)
-    except KeyError as e:
-        missing = str(e).strip("'")
-        raise KeyError(f"Falta el placeholder {{{missing}}} en {path} o no se proveyó en render_template(...)")
-
+# --- FUNCIÓN RESTAURADA ---
 def read_compose() -> str:
     return COMPOSE_FILE.read_text(encoding="utf-8")
 
@@ -223,7 +280,6 @@ def write_compose(text: str):
     COMPOSE_FILE.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
 
 def extract_used_ports(compose_text: str) -> set[int]:
-    # Captura - "8001:8000", - '8001:8000', o - 8001:8000
     ports = set()
     for m in re.finditer(r'-\s*["\']?(\d{4,5})\s*:\s*8000["\']?', compose_text):
         try:
@@ -243,7 +299,6 @@ def add_service_to_compose(service_key: str, api_dir: str, host_port: int, verbo
     text = read_compose()
     if not re.search(r"(?m)^\s*services\s*:\s*$", text):
         text = "services:\n" + text
-    # Evitar duplicado
     if re.search(rf"(?m)^\s*{re.escape(service_key)}\s*:\s*$", text):
         raise RuntimeError(f"El servicio '{service_key}' ya existe en docker-compose.yml")
     block = COMPOSE_SERVICE_TEMPLATE.format(service_key=service_key, api_dir=api_dir, host_port=host_port)
@@ -257,69 +312,73 @@ def write_file(path: Path, content: str, verbose: bool):
     path.write_text(content, encoding="utf-8")
     log(f"Escrito: {path}", verbose)
 
-def create_domain(src_dir: Path, tests_dir: Path, domain: str, verbose: bool):
-    Domain = domain.capitalize()
-    domain_dir = src_dir / domain
+# =========================
+# Lógica de creación principal
+# =========================
+def create_domain(src_dir: Path, domain_py: str, verbose: bool):
+    Domain = "".join(word.capitalize() for word in domain_py.split('_'))
+    domain_dir = src_dir / domain_py
     domain_dir.mkdir(parents=True, exist_ok=True)
+    
     write_file(domain_dir / "__init__.py", "", verbose)
-    write_file(domain_dir / "constants.py", CONSTANTS_PY, verbose)
-    write_file(domain_dir / "exceptions.py", EXCEPTIONS_PY.format(Domain=Domain, domain=domain), verbose)
     write_file(domain_dir / "schemas.py", SCHEMAS_PY.format(Domain=Domain), verbose)
-    write_file(domain_dir / "models.py", MODELS_PY.format(Domain=Domain), verbose)
-    write_file(domain_dir / "services.py", SERVICES_PY.format(Domain=Domain, domain=domain), verbose)
-    write_file(domain_dir / "router.py", ROUTER_PY.format(Domain=Domain, domain=domain), verbose)
-    # test
-    write_file(tests_dir / f"test_{domain}.py", TEST_DOMAIN.format(domain=domain), verbose)
+    write_file(domain_dir / "models.py", MODELS_PY.format(Domain=Domain, domain_py=domain_py), verbose)
+    write_file(domain_dir / "filters.py", FILTERS_PY.format(Domain=Domain), verbose)
+    write_file(domain_dir / "router.py", ROUTER_PY.format(Domain=Domain), verbose)
 
 def create_api(name: str, domains: List[str], port: int | None, no_compose: bool, force: bool, verbose: bool):
     ensure_base(verbose)
     name = sanitize_name(name)
-    domains = [sanitize_name(d) for d in domains] if domains else [name]
+    
+    domain_names_url = [sanitize_name(d) for d in domains] if domains else [name]
+    domain_pairs = [(d_url, d_url.replace('-', '_')) for d_url in domain_names_url]
 
     api_dir_name = f"api-{name}"
     api_dir = BACKEND_DIR / api_dir_name
     src_dir = api_dir / "src"
-    tests_dir = api_dir / "tests"
 
-    if api_dir.exists():
-        if not force:
-            raise FileExistsError(f"Ya existe {api_dir}. Usa --force para reutilizar/sobrescribir archivos.")
+    if api_dir.exists() and not force:
+        raise FileExistsError(f"Ya existe {api_dir}. Usa --force para reutilizar/sobrescribir archivos.")
+    
     api_dir.mkdir(parents=True, exist_ok=True)
     src_dir.mkdir(parents=True, exist_ok=True)
-    tests_dir.mkdir(parents=True, exist_ok=True)
 
-    # ---- Templates desde docker/templates ----
-    # requirements.txt (sin placeholders)
+    write_file(api_dir / ".gitignore", GITIGNORE_CONTENT, verbose)
+    
     reqs_content = read_text(TEMPLATES_DIR / "requirements.txt")
     write_file(api_dir / "requirements.txt", reqs_content, verbose)
-
-    # .env.template (con placeholders {app_title}, {service_key})
-    env_content = render_template(TEMPLATES_DIR / ".env.template",
-                                  app_title=f"API {name}",
-                                  service_key=name)
-    write_file(api_dir / ".env.template", env_content, verbose)
-
-    # ---- Resto de archivos base ----
-    write_file(api_dir / "Dockerfile", DOCKERFILE, verbose)
-    write_file(api_dir / ".dockerignore", "__pycache__\n*.pyc\n.env\n", verbose)
-    write_file(src_dir / "__init__.py", "", verbose)
-    write_file(tests_dir / "__init__.py", "", verbose)
-    write_file(tests_dir / "test_main.py", TEST_MAIN, verbose)
-
-    # Crear base SQLite específica
-    db_file = api_dir / f"bd-{name}.sqlite3"
+    
+    db_name = f"bd-{name}.sqlite3"
+    write_file(api_dir / ".env", f'DATABASE_URL="sqlite:///./{db_name}"\n', verbose)
+    db_file = api_dir / db_name
     if not db_file.exists():
         db_file.touch()
         log(f"Base SQLite creada: {db_file}", verbose)
 
-    # Domains
-    for d in domains:
-        create_domain(src_dir, tests_dir, d, verbose)
+    write_file(src_dir / "config.py", CONFIG_PY, verbose)
+    write_file(src_dir / "database.py", DATABASE_PY, verbose)
 
-    # main.py (importa e incluye todos los routers)
-    imports = "\n".join([f"from .{d}.router import router as {d}_router" for d in domains])
-    includes = "\n".join([f'app.include_router({d}_router, prefix="/{d}", tags=["{d}"])' for d in domains])
-    write_file(src_dir / "main.py", MAIN_PY.format(app_title=f"API {name}", service_key=name, imports=imports, includes=includes), verbose)
+    write_file(api_dir / "Dockerfile", DOCKERFILE, verbose)
+    write_file(api_dir / ".dockerignore", "__pycache__\n*.pyc\n.env\n", verbose)
+    write_file(src_dir / "__init__.py", "", verbose)
+
+    for _, domain_py in domain_pairs:
+        create_domain(src_dir, domain_py, verbose)
+
+    model_imports = "\n".join([f"from .{d_py} import models as {d_py}_models" for _, d_py in domain_pairs])
+    create_tables = "\n".join([f"{d_py}_models.Base.metadata.create_all(bind=engine)" for _, d_py in domain_pairs])
+    imports = "\n".join([f"from .{d_py}.router import router as {d_py}_router" for _, d_py in domain_pairs])
+    includes = "\n".join([f'app.include_router({d_py}_router, prefix="/{d_url}", tags=["{d_url}"])' for d_url, d_py in domain_pairs])
+    
+    main_content = MAIN_PY.format(
+        app_title=f"API {name}", 
+        service_key=name,
+        model_imports=model_imports,
+        create_tables=create_tables,
+        imports=imports, 
+        includes=includes
+    )
+    write_file(src_dir / "main.py", main_content, verbose)
 
     print(f"✅ API creada en: {api_dir}")
 
@@ -327,7 +386,6 @@ def create_api(name: str, domains: List[str], port: int | None, no_compose: bool
         print("ℹ️ No se modificó docker-compose.yml (--no-compose)")
         return
 
-    # Compose
     compose_text = read_compose()
     chosen_port = port if port else next_free_port(compose_text)
     add_service_to_compose(name, api_dir_name, chosen_port, verbose)
