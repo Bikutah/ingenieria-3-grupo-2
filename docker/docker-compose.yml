@@ -52,3 +52,14 @@ services:
     restart: always
     env_file:
       - ../backend/api-gestion-mesas/.env
+  gestion-reservas:
+    build:
+      context: ../backend/api-gestion-reservas
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8000"
+    volumes:
+      - ../backend/api-gestion-reservas:/app
+    restart: always
+    env_file:
+      - ../backend/api-gestion-reservas/.env
