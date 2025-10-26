@@ -6,6 +6,7 @@ import ClientePage from './pages/cliente/ClientePage';
 import ProductoPage from './pages/producto/ProductoPage';
 import MesasPage from './pages/mesas/MesasPage';
 import SectoresPage from './pages/sectores/SectoresPage';
+import ReservasPage from './pages/reservas/ReservasPage';
 import { Toaster } from "sonner"
 
 function App() {
@@ -21,12 +22,8 @@ function App() {
           <Route path="productos" element={<ProductoPage />} />
           <Route path="mesas" element={<MesasPage />} />
           <Route path="sectores" element={<SectoresPage />} />
+          <Route path="reservas" element={<ReservasPage />} />
         </Route>
-        
-
-        
-        {/* Aquí puedes agregar rutas que no usen el layout del dashboard (ej: Login) */}
-        {/* <Route path="login" element={<LoginPage />} /> */}
         
         {/* Ruta para "Página no encontrada" (404) */}
         <Route path="*" element={<div>404 - Página no encontrada</div>} />

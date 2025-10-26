@@ -74,7 +74,7 @@ const itemsGestiones = [
 const itemsFunciones = [
   {
     title: "Reservas",
-    url: "#",
+    url: "reservas",
     icon: NotebookTabs,
   },
   {
