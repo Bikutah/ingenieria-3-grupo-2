@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from datetime import datetime
+from datetime import time, date
 from typing import List, Optional
 
 # Schemas para DetalleMenu
@@ -30,8 +30,8 @@ class MenuReservaOut(MenuReservaBase):
 
 # Schemas para Reserva
 class ReservaBase(BaseModel):
-    fecha: datetime
-    horario: str = Field(..., min_length=1, max_length=10)
+    fecha: date
+    horario: time
     cantidad_personas: int = Field(..., gt=0)
     id_mesa: int = Field(..., gt=0)
     id_cliente: int = Field(..., gt=0)
@@ -41,8 +41,8 @@ class ReservaCreate(ReservaBase):
     menu_reservas: List[MenuReservaCreate] = []
 
 class ReservaUpdate(BaseModel):
-    fecha: Optional[datetime] = None
-    horario: Optional[str] = Field(None, min_length=1, max_length=10)
+    fecha: Optional[date] = None
+    horario: Optional[time] = None
     cantidad_personas: Optional[int] = Field(None, gt=0)
     id_mesa: Optional[int] = Field(None, gt=0)
     id_cliente: Optional[int] = Field(None, gt=0)

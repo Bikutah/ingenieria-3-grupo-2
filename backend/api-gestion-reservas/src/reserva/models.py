@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Float, Time, Date
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from ..database import Base
@@ -7,8 +7,8 @@ class Reserva(Base):
     __tablename__ = "reservas"
 
     id = Column(Integer, primary_key=True, index=True)
-    fecha = Column(DateTime, nullable=False, index=True)
-    horario = Column(String, nullable=False)
+    fecha = Column(Date, nullable=False, index=True)
+    horario = Column(Time, nullable=False, index=True)
     cantidad_personas = Column(Integer, nullable=False)
     id_mesa = Column(Integer, nullable=False)
     id_cliente = Column(Integer, nullable=False)

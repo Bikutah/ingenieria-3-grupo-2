@@ -16,18 +16,10 @@ router = APIRouter()
 
 @router.post("/", response_model=schemas.ReservaOut, status_code=status.HTTP_201_CREATED)
 def create(payload: schemas.ReservaCreate, db: Session = Depends(get_db)):
-    # Crear la reserva principal
-    db_reserva = models.Reserva(
-        fecha=payload.fecha,
-        horario=payload.horario,
-        cantidad_personas=payload.cantidad_personas,
-        id_mesa=payload.id_mesa,
-        id_cliente=payload.id_cliente,
-        baja=payload.baja
-    )
-    db.add(db_reserva)
-    db.flush()
-    
+    # Validar la reserva antes de crearla
+    validator = ReservaValidator(db)
+    validator.validar_creacion_reserva(payload)
+
     # Crear la reserva principal
     db_reserva = models.Reserva(
         fecha=payload.fecha,
@@ -81,6 +73,10 @@ def get_one(id_: int, db: Session = Depends(get_db)):
 
 @router.put("/{id_}", response_model=schemas.ReservaOut)
 def modify(id_: int, payload: schemas.ReservaUpdate, db: Session = Depends(get_db)):
+    # Validar la actualización de la reserva
+    validator = ReservaValidator(db)
+    validator.validar_actualizacion_reserva(id_, payload)
+
     db_reserva = db.get(models.Reserva, id_)
     if db_reserva is None:
         raise HTTPException(status_code=404, detail="Reserva no encontrada")
