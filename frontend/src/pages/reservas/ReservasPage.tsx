@@ -54,6 +54,8 @@ import {
   CommandList,
 } from "@/components/ui/command"
 
+import { Checkbox } from "@/components/ui/checkbox"
+
 import { Plus, Pencil, Trash2 } from "lucide-react"
 
 import type { Reserva as DomainReserva } from "@/services/reservas/types/Reserva"
@@ -76,6 +78,9 @@ import type { Mesas } from "@/services/mesas/types/Mesas"
 import { toast } from "sonner"
 import { extractApiErrorMessage } from "@/lib/api-error"
 import { Check, ChevronsUpDown } from "lucide-react";
+
+import { productoService } from "@/services/producto/api/ProductoService"
+import type { Producto } from "@/services/producto/types/Producto"
 
 
 // Alias para no chocar nombres
@@ -100,14 +105,18 @@ export default function ReservasPage() {
 
 
   // El formulario ahora usa el schema nuevo
+  // NUEVO: flag controlado por checkbox
+  const [hasMenu, setHasMenu] = useState(false)
+
+  // Reemplazá tu formData inicial por este
   const [formData, setFormData] = useState<Omit<Reserva, "id">>({
     fecha: "",
     horario: "",
     cantidad_personas: "",
     id_mesa: 0,
     id_cliente: 0,
-    baja: true,
-    menu_reserva: []
+    baja: false,
+    menu_reserva: null,
   })
 
   const DEFAULT_FILTERS: Omit<ReservasListParams, "page" | "size"> = {
@@ -160,6 +169,26 @@ export default function ReservasPage() {
     if (!data.id_mesa || data.id_mesa <= 0) errors.id_mesa = "Elegí una mesa";
 
     if (!data.id_cliente || data.id_cliente <= 0) errors.id_cliente = "Cliente inválido";
+
+    // Validaciones del menú, solo si hasMenu está activo
+    if (hasMenu) {
+      if (!data.menu_reserva) {
+        errors.menu_reserva = "Falta el menú"
+      } else {
+        const detalles = data.menu_reserva.detalles_menu ?? []
+        const tieneAlgo = detalles.some(d => (d.cantidad ?? 0) > 0)
+        if (!tieneAlgo) {
+          errors.menu_reserva = "Agregá al menos un producto con cantidad > 0"
+        }
+        const senia = data.menu_reserva.monto_seña ?? 0
+        if (senia < 0) {
+          errors.menu_reserva = "La seña no puede ser negativa"
+        }
+        // Si querés validar duro el 30% para 6+ personas, avisame y te paso el cálculo del total.
+        // (Necesita sumar precio*cantidad en UI; por ahora lo dejamos como sugerencia visual).
+      }
+    }
+
 
     setFormErrors(errors);
     const ok = Object.keys(errors).length === 0;
@@ -237,6 +266,78 @@ export default function ReservasPage() {
   useEffect(() => {
     if (clienteOpen) loadClientes("")
   }, [clienteOpen, loadClientes])
+
+  // --- Productos combobox state ---
+  const [productos, setProductos] = useState<Producto[]>([])
+  const [productosLoading, setProductosLoading] = useState(false)
+  const [productoOpen, setProductoOpen] = useState(false)
+  const [productoQuery, setProductoQuery] = useState("")
+  const selectedIds = new Set(
+    formData.menu_reserva?.detalles_menu?.map(d => d.id_producto) ?? []
+  )
+
+  // Etiqueta bonita
+  const productoLabel = (p: Producto) =>
+    `#${p.id} · ${p.nombre} — $${p.precio}${p.cm3 ? ` · ${p.cm3}cm³` : ""}`
+
+  // Loader con filtro activo + búsqueda
+  const loadProductos = useCallback(
+    async (q?: string) => {
+      setProductosLoading(true)
+      try {
+        const params: any = { activo: true, page: 1, size: 50 }
+        if (q && q.trim()) params.q = q.trim()
+        const res = await productoService.list(params)
+        setProductos(res.items ?? [])
+      } catch (e) {
+        console.error("Error cargando productos:", e)
+        setProductos([])
+      } finally {
+        setProductosLoading(false)
+      }
+    },
+    []
+  )
+
+  // Debounce de query solo si el popover está abierto
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (productoOpen) loadProductos(productoQuery)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [productoQuery, productoOpen, loadProductos])
+
+  // Primer fetch al abrir
+  useEffect(() => {
+    if (productoOpen) loadProductos("")
+  }, [productoOpen, loadProductos])
+
+  // --- Helpers para detalles del menú ---
+  // Garantiza que menu_reserva exista
+  const ensureMenu = () => {
+    setFormData(fd => ({
+      ...fd,
+      menu_reserva: fd.menu_reserva ?? { monto_seña: 0, detalles_menu: [] },
+    }))
+  }
+
+  // Suma +1 al producto (o lo crea con 1)
+  const addOrIncProducto = (prodId: number, prodPrecio: number) => {
+    setFormData(fd => {
+      const current = fd.menu_reserva ?? { monto_seña: 0, detalles_menu: [] }
+      const detalles = [...current.detalles_menu]
+      const idx = detalles.findIndex(d => d.id_producto === prodId)
+      if (idx >= 0) {
+        detalles[idx] = { ...detalles[idx], cantidad: (detalles[idx].cantidad ?? 0) + 1 }
+      } else {
+        detalles.push({ id_producto: prodId, cantidad: 1, precio: prodPrecio })
+      }
+      return {
+        ...fd,
+        menu_reserva: { ...current, detalles_menu: detalles },
+      }
+    })
+  }
 
 
   // --- Sectores combobox state ---
@@ -360,8 +461,9 @@ export default function ReservasPage() {
         id_mesa: reserva.id_mesa,
         id_cliente: reserva.id_cliente,
         baja: reserva.baja,
-        menu_reserva: reserva.menu_reserva
+        menu_reserva: reserva.menu_reserva ?? null,
       })
+      setHasMenu(Boolean(reserva.menu_reserva))
     } else {
       setSelectedReserva(null)
       setFormData({
@@ -370,23 +472,20 @@ export default function ReservasPage() {
         cantidad_personas: "",
         id_mesa: 0,
         id_cliente: 0,
-        baja: true,
-        menu_reserva: []
+        baja: false,
+        menu_reserva: null,
       })
+      setHasMenu(false)
     }
     setIsDialogOpen(true)
     loadMesasBySector(uiSelections.sectorId, capacidadRequerida)
   }
 
+
   const handleSave = async () => {
-    // Tocar todo para que aparezcan errores
     setTouched({
-      fecha: true,
-      horario: true,
-      cantidad_personas: true,
-      id_sector: true,
-      id_mesa: true,
-      id_cliente: true,
+      fecha: true, horario: true, cantidad_personas: true,
+      id_sector: true, id_mesa: true, id_cliente: true,
     });
 
     if (!validateForm()) {
@@ -394,33 +493,43 @@ export default function ReservasPage() {
       return;
     }
 
+    const payload: Omit<Reserva, "id"> = {
+      ...formData,
+      // ⬇️ Cambiá a Number(...) si tu backend lo quiere numérico
+      cantidad_personas: String(formData.cantidad_personas),
+      menu_reserva: hasMenu
+        ? (formData.menu_reserva
+          ? {
+            monto_seña: Number(formData.menu_reserva.monto_seña || 0),
+            detalles_menu: (formData.menu_reserva?.detalles_menu || [])
+              .filter(d => (d.cantidad ?? 0) > 0)
+              .map(d => ({ id_producto: d.id_producto, cantidad: d.cantidad, precio: d.precio })),
+
+          }
+          : { monto_seña: 0, detalles_menu: [] })
+        : null,
+    };
+
     try {
-      setSaving(true)
+      setSaving(true);
       if (selectedReserva) {
-        const updated = await reservasService.update(selectedReserva.id, {
-          ...formData,
-          // Si tu API espera número en cantidad_personas:
-          cantidad_personas: String(formData.cantidad_personas)
-        })
-        setReservas(prev => prev.map(r => (r.id === selectedReserva.id ? updated : r)))
-        toast.success("Reserva actualizada", { description: `#${updated?.id ?? selectedReserva.id}` })
+        const updated = await reservasService.update(selectedReserva.id, payload);
+        setReservas(prev => prev.map(r => (r.id === selectedReserva.id ? updated : r)));
+        toast.success("Reserva actualizada", { description: `#${updated?.id ?? selectedReserva.id}` });
       } else {
-        const created = await reservasService.create({
-          ...formData,
-          cantidad_personas: String(formData.cantidad_personas)
-        })
-        // opcional: recargar lista en vez de push (para respetar orden/paginación)
-        await loadPage(1, size)
-        toast.success("Reserva creada", { description: `#${created?.id ?? "?"}` })
+        const created = await reservasService.create(payload);
+        await loadPage(1, size);
+        toast.success("Reserva creada", { description: `#${created?.id ?? "?"}` });
       }
-      setIsDialogOpen(false)
+      setIsDialogOpen(false);
     } catch (e) {
-      toast.error("No se pudo guardar", { description: extractApiErrorMessage(e) })
-      console.error(e)
+      toast.error("No se pudo guardar", { description: extractApiErrorMessage(e) });
+      console.error(e);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
+
 
 
   const handleDelete = async () => {
@@ -742,6 +851,7 @@ export default function ReservasPage() {
 
                             <CommandGroup heading="Resultados">
                               {clientes.map((c) => {
+
                                 const selected = formData.id_cliente === c.id
                                 return (
                                   <CommandItem
@@ -772,6 +882,211 @@ export default function ReservasPage() {
                   </p>
                 )}
               </div>
+
+
+              {/* --- MENÚ RESERVA: Toggle --- */}
+              <div className="flex flex-col gap-6">
+                <Label className="hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 has-[[aria-checked=true]]:border-blue-600 has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
+                  <Checkbox
+                    id="toggle-menu"
+                    checked={hasMenu}
+                    onCheckedChange={(v) => {
+                      const enabled = Boolean(v)
+                      setHasMenu(enabled)
+                      setFormData(fd => ({
+                        ...fd,
+                        menu_reserva: enabled
+                          ? (fd.menu_reserva ?? { monto_seña: 0, detalles_menu: [] })
+                          : null
+                      }))
+                    }}
+                    className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
+                  />
+                  <div className="grid gap-1.5 font-normal">
+                    <p className="text-sm leading-none font-medium">La reserva tiene menú</p>
+                    <p className="text-muted-foreground text-sm">
+                      Recordá que si son 6+ personas se sugiere una seña del 30%.
+                    </p>
+                  </div>
+                </Label>
+              </div>
+
+              {hasMenu && (
+
+
+
+                <div className="grid gap-1.5">
+
+
+                  
+                  <Label>Productos del menú</Label>
+                  <Popover open={productoOpen} onOpenChange={setProductoOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between"
+                        aria-expanded={productoOpen}
+                        onClick={() => ensureMenu()}
+                      >
+                        Agregar productos…
+                        <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                      <Command>
+                        <CommandInput
+                          placeholder="Buscar por nombre, tipo…"
+                          value={productoQuery}
+                          onValueChange={setProductoQuery}
+                        />
+                        <CommandList>
+                          {productosLoading ? (
+                            <div className="p-3 text-sm text-muted-foreground">Cargando…</div>
+                          ) : (
+                            <>
+                              <CommandEmpty className="p-3">
+                                No se encontraron productos
+                              </CommandEmpty>
+
+                              <CommandGroup heading="Resultados">
+                                {productos.filter(p => !selectedIds.has(p.id)).map((p) => (
+                                  <CommandItem
+                                    key={p.id}
+                                    value={String(p.id)}
+                                    onSelect={() => {
+                                      ensureMenu()
+                                      addOrIncProducto(p.id, p.precio)
+                                      setProductoOpen(false)
+                                    }}
+                                  >
+                                    {productoLabel(p)}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Lista compacta de seleccionados (cantidad editable) */}
+                  {formData.menu_reserva?.detalles_menu?.length ? (
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Producto</TableHead>
+                            <TableHead className="text-center">Cant.</TableHead>
+                            <TableHead className="text-right">Acciones</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {formData.menu_reserva.detalles_menu.map((d) => {
+                            const prod = productos.find(pp => pp.id === d.id_producto)
+                            // si no está en "productos" porque cambió la búsqueda, solo mostramos el id
+                            const label = prod ? productoLabel(prod) : `#${d.id_producto}`
+                            return (
+                              <TableRow key={d.id_producto}>
+                                <TableCell>{label}</TableCell>
+                                <TableCell className="text-center">
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    value={d.cantidad ?? 0}
+                                    className="w-20 text-center"
+                                    onChange={(e) => {
+                                      const qty = Math.max(0, Number(e.target.value || 0))
+                                      setFormData(fd => {
+                                        if (!fd.menu_reserva) return fd
+                                        const copy = fd.menu_reserva.detalles_menu.map(x =>
+                                          x.id_producto === d.id_producto ? { ...x, cantidad: qty } : x
+                                        )
+                                        return { ...fd, menu_reserva: { ...fd.menu_reserva, detalles_menu: copy } }
+                                      })
+                                    }}
+                                  />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setFormData(fd => {
+                                        if (!fd.menu_reserva) return fd
+                                        return {
+                                          ...fd,
+                                          menu_reserva: {
+                                            ...fd.menu_reserva,
+                                            detalles_menu: fd.menu_reserva.detalles_menu.filter(x => x.id_producto !== d.id_producto)
+                                          }
+                                        }
+                                      })
+                                    }}
+                                  >
+                                    Quitar
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+
+
+                      
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Aún no agregaste productos.</p>
+                  )}
+                </div>
+                
+              )
+              
+              
+              }
+
+              {hasMenu && (
+
+                              <div className="grid gap-1.5">
+                <Label htmlFor="senia">Seña</Label>
+                <Input
+                  id="senia"
+                  type="number"
+                  min={0}
+                  value={formData.menu_reserva?.monto_seña ?? 0}
+                  onChange={(e) => {
+                    const val = Number(e.target.value || 0)
+                    setFormData(fd => ({
+                      ...fd,
+                      menu_reserva: {
+                        ...(fd.menu_reserva ?? { monto_seña: 0, detalles_menu: [] }),
+                        monto_seña: val
+                      }
+                    }))
+                  }}
+                  onBlur={() => markTouched("menu_reserva")}
+                  aria-invalid={!!(touched.menu_reserva && formErrors.menu_reserva)}
+                  aria-describedby={touched.menu_reserva && formErrors.menu_reserva ? "menu-error" : undefined}
+                  className={touched.menu_reserva && formErrors.menu_reserva ? errorClass : undefined}
+                />
+                {touched.menu_reserva && formErrors.menu_reserva && (
+                  <p id="menu-error" className="text-sm text-red-600">{formErrors.menu_reserva}</p>
+                )}
+                {/* Sugerencia opcional si querés mostrar el 30% sin validar duro */}
+                {Number(formData.cantidad_personas) >= 6 && (
+                  <p className="text-xs text-muted-foreground">
+                    Sugerido: al menos 30% del total del menú.
+                  </p>
+                )}
+              </div>)
+              
+              
+              }
+
 
             </div>
 

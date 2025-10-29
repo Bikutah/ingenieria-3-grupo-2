@@ -26,28 +26,26 @@ def create(payload: schemas.ReservaCreate, db: Session = Depends(get_db)):
         horario=payload.horario,
         cantidad_personas=payload.cantidad_personas,
         id_mesa=payload.id_mesa,
-        id_cliente=payload.id_cliente,
-        baja=payload.baja
+        id_cliente=payload.id_cliente
     )
     db.add(db_reserva)
-    db.flush()
-    
-    # Crear los menús de reserva si existen
-    for menu_reserva in payload.menu_reservas:
+    db.flush()  
+
+    menu_reserva = payload.menu_reserva
+    if menu_reserva is not None:
         db_menu_reserva = models.MenuReserva(
-            id_reserva=db_reserva.id,
-            monto_seña=menu_reserva.monto_seña
+            monto_seña=menu_reserva.monto_seña,
+            reserva=db_reserva, 
         )
         db.add(db_menu_reserva)
         db.flush()
-        
-        # Crear los detalles del menú
+
         for detalle in menu_reserva.detalles_menu:
             db_detalle = models.DetalleMenu(
-                id_menu_reserva=db_menu_reserva.id,
+                menu_reserva=db_menu_reserva, 
                 id_producto=detalle.id_producto,
                 cantidad=detalle.cantidad,
-                precio=detalle.precio
+                precio=detalle.precio,
             )
             db.add(db_detalle)
     

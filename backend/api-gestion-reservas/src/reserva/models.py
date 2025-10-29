@@ -15,7 +15,11 @@ class Reserva(Base):
     baja = Column(Boolean, default=False)
     
     # Relación con MenuReserva
-    menu_reservas = relationship("MenuReserva", back_populates="reserva")
+    menu_reserva = relationship(
+        "MenuReserva",
+        back_populates="reserva",
+        uselist=False
+    )
 
 class MenuReserva(Base):
     __tablename__ = "menu_reserva"
@@ -25,7 +29,7 @@ class MenuReserva(Base):
     monto_seña = Column(Float, nullable=True)
     
     # Relaciones
-    reserva = relationship("Reserva", back_populates="menu_reservas")
+    reserva = relationship("Reserva", back_populates="menu_reserva", uselist=False)
     detalles_menu = relationship("DetalleMenu", back_populates="menu_reserva")
 
 class DetalleMenu(Base):

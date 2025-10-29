@@ -8,7 +8,7 @@ export type Reserva = {
   id_mesa: number;
   id_cliente: number;
   baja: boolean;
-  menu_reserva: MenuReserva[]
+  menu_reserva: MenuReserva | null;
 };
 
 export type ReservasListParams = {

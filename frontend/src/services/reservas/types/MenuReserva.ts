@@ -1,5 +1,6 @@
+import type { DetalleMenu } from "./DetallesMenu";
+
 export type MenuReserva = {
-  id_producto: string;
-  cantidad: string;
-  precio: string;
+  monto_seña: number;
+  detalles_menu: DetalleMenu[];
 };

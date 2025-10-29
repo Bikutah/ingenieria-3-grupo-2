@@ -38,7 +38,7 @@ class ReservaBase(BaseModel):
     baja: bool = False
 
 class ReservaCreate(ReservaBase):
-    menu_reservas: List[MenuReservaCreate] = []
+    menu_reserva: Optional[MenuReservaCreate] = None
 
 class ReservaUpdate(BaseModel):
     fecha: Optional[date] = None
@@ -50,5 +50,5 @@ class ReservaUpdate(BaseModel):
 
 class ReservaOut(ReservaBase):
     id: int
-    menu_reservas: List[MenuReservaOut] = []
+    menu_reserva: Optional[MenuReservaCreate] = None
     model_config = ConfigDict(from_attributes=True)
