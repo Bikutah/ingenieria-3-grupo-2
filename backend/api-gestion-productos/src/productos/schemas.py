@@ -15,6 +15,7 @@ class ProductosBase(BaseModel):
     precio: float = Field(..., gt=0, description="Precio del producto")
     descripcion: Optional[str] = Field(None, max_length=255, description="Descripción opcional del producto")
     cm3: Optional[int] = Field(None, gt=0, description="Volumen en cm3 (solo para bebidas)")
+    id_carta: int = Field(..., description="ID de la carta a la que pertenece el producto")
     baja: bool = Field(False, description="Indica si el producto está dado de baja (True) o activo (False)")
 
 
@@ -30,6 +31,7 @@ class ProductosModify(ProductosBase):
     precio: Optional[float] = Field(None, gt=0)
     descripcion: Optional[str] = Field(None, max_length=255)
     cm3: Optional[int] = Field(None, gt=0)
+    id_carta: Optional[int] = Field(None, description="ID de la carta a la que pertenece el producto")
     baja: Optional[bool] = None
 
 

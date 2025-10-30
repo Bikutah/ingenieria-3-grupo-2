@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional
+from typing import Optional, List
+from ..productos.schemas import ProductosOut # Importar el esquema de ProductosOut
 
 
 class CartaBase(BaseModel):
@@ -19,5 +20,5 @@ class CartaModify(CartaBase):
 
 class CartaOut(CartaBase):
     id: int
+    productos: List[ProductosOut] = [] # Lista de productos asociados a esta carta
     model_config = ConfigDict(from_attributes=True) # Permite que Pydantic lea desde objetos ORM
-

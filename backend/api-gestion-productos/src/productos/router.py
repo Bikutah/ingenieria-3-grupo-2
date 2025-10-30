@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from ..database import get_db
+from ..carta import models as carta_models # Importar el modelo de Carta
 from . import models, schemas
 from .filters import ProductosFilter
 
@@ -19,12 +20,20 @@ def create(payload: schemas.ProductosCreate, db: Session = Depends(get_db)):
     if producto_existente:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Ya existe un producto con el nombre '{payload.nombre}'"
+            detail=f"Ya existe un producto con el nombre '{payload.nombre}'",
+        )
+
+    # Verificar que la carta exista
+    carta_existente = db.get(carta_models.Carta, payload.id_carta)
+    if not carta_existente:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Carta con ID '{payload.id_carta}' no encontrada",
         )
 
     # Creamos el objeto del modelo a partir del payload Pydantic
     # El método model_dump() convierte el schema en un diccionario
-    db_obj = models.Productos(**payload.model_dump())
+    db_obj = models.Productos(**payload.model_dump(exclude_unset=True))
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)
@@ -44,12 +53,21 @@ def modify(producto_id: int, payload: schemas.ProductosModify, db: Session = Dep
     producto = db.get(models.Productos, producto_id)
     if not producto:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Producto no encontrado"
         )
-    
+
     # Obtenemos los datos del payload que realmente se enviaron (para no sobreescribir con None)
     data = payload.model_dump(exclude_unset=True)
+
+    # Si se intenta modificar id_carta, verificar que la nueva carta exista
+    if "id_carta" in data and data["id_carta"] is not None:
+        carta_existente = db.get(carta_models.Carta, data["id_carta"])
+        if not carta_existente:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Carta con ID '{data['id_carta']}' no encontrada",
+            )
 
     # Actualizamos los campos del objeto de la base de datos
     for campo, valor in data.items():
@@ -64,7 +82,7 @@ def get_one(id_: int, db: Session = Depends(get_db)):
     obj = db.get(models.Productos, id_)
     if obj is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Producto no encontrado"
         )
     return obj

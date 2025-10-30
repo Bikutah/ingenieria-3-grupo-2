@@ -10,6 +10,7 @@ class ProductosFilter(Filter):
     precio__gte: float | None = None
     precio__lte: float | None = None
     created_at__gte: str | None = None
+    id_carta: int | None = None # Nuevo filtro por ID de carta
     created_at__lte: str | None = None
     baja: bool | None = None
 
