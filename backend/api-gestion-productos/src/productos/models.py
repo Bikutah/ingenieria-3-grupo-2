@@ -4,8 +4,8 @@ from ..database import Base
 from .schemas import TipoProducto # Importamos el Enum para usarlo en la columna
 
 class Productos(Base):
-    __tablename__ = "productos" # Nombre de la tabla (corregido de "productoss")
-    id = Column(Integer, primary_key=True, index=True) # ¡Esta línea faltaba!
+    __tablename__ = "productos" # Nombre de la tabla
+    id = Column(Integer, primary_key=True, index=True) 
     nombre = Column(String(100), index=True, nullable=False, unique=True)
     tipo = Column(Enum(TipoProducto), nullable=False)
     precio = Column(Float, nullable=False)

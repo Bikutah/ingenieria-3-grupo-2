@@ -8,5 +8,7 @@ class Carta(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(100), index=True, nullable=False, unique=True)
     baja = Column(Boolean, default=False, nullable=False) # Asegúrate de que esta columna exista si la usas en schemas
-    
+    created_at = Column(DateTime, server_default=func.now(), index=True)
+
+
     productos = relationship("Productos", back_populates="carta") # Relación con el modelo Productos
