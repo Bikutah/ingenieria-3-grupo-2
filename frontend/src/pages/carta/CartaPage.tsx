@@ -61,40 +61,30 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 
-import type { Producto as DomainProducto } from "@/services/producto/types/Producto"
-import type { Carta as DomainCarta } from "@/services/carta/types/Carta"
-import { productoService } from "@/services/producto/api/ProductoService"
+import type { Carta as DomainCarta } from "@/services/producto/types/Carta"
+import { cartaService } from "@/services/producto/api/CartaService"
 
 // Alias para no chocar nombres
-type Producto = DomainProducto
 type Carta = DomainCarta
 const PAGE_SIZE = 50;
 
 
-export default function ProductoPage() {
-  const [productos, setProductos] = useState<Producto[]>([]);
+export default function CartaPage() {
+  const [cartas, setCartas] = useState<Carta[]>([]);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(PAGE_SIZE);
   const [total, setTotal] = useState<number>(0);
   const [pages, setPages] = useState<number | undefined>(undefined);
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null)
-  const [productoToDelete, setProductoToDelete] = useState<number | null>(null)
+  const [selectedCarta, setSelectedCarta] = useState<Carta | null>(null)
+  const [cartaToDelete, setCartaToDelete] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [selectedCarta, setSelectedCarta] = useState<Carta[]>([]);
-  const selectedNombre = cartas.find(c => c.id === selectedCarta)?.nombre ?? "Seleccionar carta"
 
-
-  const [formData, setFormData] = useState<Omit<Producto, "id">>({
+  const [formData, setFormData] = useState<Omit<Carta, "id">>({
     nombre: "",
-    tipo: "",
-    precio: "",
-    descripcion: "",
-    cm3: "",
     baja: false,
-    idcarta: null,
   })
   
   type ListParams = {
@@ -123,16 +113,14 @@ export default function ProductoPage() {
     async (p: number, s = size) => {
       setLoading(true);
       try {
-        const { items, total, page, pages, size } = await productoService.list({ page: p, size: s, ...filters });
-        setProductos(items);
+        const { items, total, page, pages, size } = await cartaService.list({ page: p, size: s, ...filters });
+        setCartas(items);
         setTotal(total ?? 0);
         setPage(page ?? p);
         setPages(pages);
         setSize(size ?? s);
-        const { items: cartasItems } = await cartaService.list()
-        setCartas(cartasItems)
       } catch (e) {
-        console.error("Error cargando productos:", e);
+        console.error("Error cargando carta:", e);
       } finally {
         setLoading(false);
       }
@@ -145,16 +133,16 @@ export default function ProductoPage() {
     (async () => {
       setLoading(true);
       try {
-        const data = await productoService.list({ page: 1, size: PAGE_SIZE, ...filters });
+        const data = await cartaService.list({ page: 1, size: PAGE_SIZE, ...filters });
         console.log("Respuesta del servicio:", data);
         if (!mounted) return;
-        setProductos(data.items);
+        setCartas(data.items);
         setTotal(data.total ?? 0);
         setPage(data.page ?? 1);
         setPages(data.pages);
         setSize(data.size ?? PAGE_SIZE);
       } catch (e) {
-        console.error("Error cargando productos:", e);
+        console.error("Error cargando carta:", e);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -162,25 +150,18 @@ export default function ProductoPage() {
     return () => { mounted = false; };
   }, []);
   
-  const handleOpenDialog = (producto?: Producto) => {
-    if (producto) {
-      setSelectedProducto(producto)
+  const handleOpenDialog = (carta?: Carta) => {
+    if (carta) {
+      setSelectedCarta(carta)
       setFormData({
-		tipo : producto.tipo,
-        nombre: producto.nombre,
-        precio: producto.precio,
-        descripcion: producto.descripcion,
-        cm3 : producto.cm3,
-        activo: producto.activo,
+        nombre: carta.nombre,
+        baja: carta.baja,
       })
     } else {
-      setSelectedProducto(null)
+      setSelectedCarta(null)
       setFormData({
         nombre: "",
-        precio: "",
-        descripcion: "",
-        cm3: null,
-        activo: true,
+        baja: false,
       })
     }
     setIsDialogOpen(true)
@@ -189,35 +170,35 @@ export default function ProductoPage() {
   const handleSave = async () => {
     try {
       setSaving(true)
-      if (selectedProducto) {
-        const updated = await productoService.update(selectedProducto.id, formData)
-        setProducto(prev => prev.map(m => (m.id === selectedProducto.id ? updated : m)))
+      if (selectedCarta) {
+        const updated = await cartaService.update(selectedCarta.id, formData)
+        setSelectedCarta(prev => prev.map(m => (m.id === selectedCarta.id ? updated : m)))
       } else {
-        const created = await productoService.create(formData)
-        setProductos(prev => [...prev, created])
+        const created = await cartaService.create(formData)
+        setCartas(prev => [...prev, created])
       }
       setIsDialogOpen(false)
     } catch (e) {
-      console.error("Error guardando producto:", e)
+      console.error("Error guardando carta:", e)
     } finally {
       setSaving(false)
     }
   }
   
   const handleDelete = async () => {
-    if (!productoToDelete) return
+    if (!cartaToDelete) return
     try {
-      await productoService.remove(productoToDelete)
-      setProductos(prev => prev.filter(m => m.id !== productoToDelete))
+      await cartaService.remove(cartaToDelete)
+      setCartas(prev => prev.filter(m => m.id !== cartaToDelete))
       setIsDeleteDialogOpen(false)
-      setProductoToDelete(null)
+      setCartaToDelete(null)
     } catch (e) {
-      console.error("Error eliminando producto:", e)
+      console.error("Error eliminando carta:", e)
     }
   }
 
   const openDeleteDialog = (id: number) => {
-    setProductoToDelete(id)
+    setSeccionToDelete(id)
     setIsDeleteDialogOpen(true)
   }
 
@@ -225,9 +206,9 @@ export default function ProductoPage() {
 		<div className="space-y-6">
 		  <div className="flex items-center justify-between">
 			<div>
-			  <h1 className="text-3xl font-bold">Gestión de Productos</h1>
+			  <h1 className="text-3xl font-bold">Gestión de Carta</h1>
 			  <p className="mt-2 text-muted-foreground">
-				{loading ? "Cargando..." : "Administra los productos de tu restaurante"}
+				{loading ? "Cargando..." : "Administra las secciones de la carta"}
 			  </p>
 			</div>
 			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -239,34 +220,12 @@ export default function ProductoPage() {
 			  </DialogTrigger>
 			  <DialogContent>
 				<DialogHeader>
-				  <DialogTitle>{selectedProducto ? "Modificar Producto" : "Nuevo Producto"}</DialogTitle>
+				  <DialogTitle>{selectedProducto ? "Modificar Carta" : "Nueva Carta"}</DialogTitle>
 				  <DialogDescription>
-					{selectedProducto ? "Modifica los datos del producto" : "Completa los datos del nuevo producto"}
+					{selectedProducto ? "Modifica los datos de la carta" : "Completa los datos de la nueva carta"}
 				  </DialogDescription>
 				</DialogHeader>
 				<div className="grid gap-4 py-4">
-					<div className="grid gap-2">
-					  <Label htmlFor="tipo">Tipo de producto</Label>
-					  <DropdownMenu>
-						<DropdownMenuTrigger asChild>
-						  <Button variant="outline">
-							{formData.tipo ? formData.tipo : "Seleccionar tipo"}
-						  </Button>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent>
-						  <DropdownMenuItem onClick={() => setFormData({ ...formData, tipo: "plato" })}>
-							Plato
-						  </DropdownMenuItem>
-						  <DropdownMenuItem onClick={() => setFormData({ ...formData, tipo: "postre" })}>
-							Postre
-						  </DropdownMenuItem>
-						  <DropdownMenuItem onClick={() => setFormData({ ...formData, tipo: "bebida" })}>
-							Bebida
-						  </DropdownMenuItem>
-						</DropdownMenuContent>
-					  </DropdownMenu>
-					</div>
-				  <div className="grid gap-2">
 					<Label htmlFor="nombre">Nombre</Label>
 					<Input
 					  id="nombre"
@@ -274,55 +233,13 @@ export default function ProductoPage() {
 					  onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
 					/>
 				  </div>
-				  <div className="grid gap-2">
-					<Label htmlFor="precio">Precio</Label>
-					<Input
-					  id="precio"
-					  value={formData.precio}
-					  onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
-					/>
-				  </div>
-				  <div className="grid gap-2">
-					<Label htmlFor="descripcion">Descripcion</Label>
-					<Input
-					  id="descripcion"
-					  value={formData.descripcion}
-					  onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-					/>
-				  {formData.tipo === "bebida" && (
-					  <div className="grid gap-2">
-						<Label htmlFor="cm3">cm3</Label>
-						<Input
-						  id="cm3"
-						  type="number"
-						  value={formData.cm3}
-						  onChange={(e) => setFormData({ ...formData, cm3: e.target.value })}
-						/>
-					  </div>
-					)}
-                    <div className="grid gap-2">
-                       <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline">{selectedNombre}</Button>
-                          </DropdownMenuTrigger>
-
-                          <DropdownMenuContent>
-                            {cartas.map(carta => (
-                              <DropdownMenuItem key={carta.id} onClick={() => setSelectedCarta(carta.id)}>
-                                {carta.nombre}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu> 
-                    </div>
-				</div>
 			</div>
 				<DialogFooter>
 				  <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
 					Cancelar
 				  </Button>
 				  <Button onClick={handleSave} disabled={saving}>
-					{selectedProducto ? "Guardar Cambios" : "Crear Producto"}
+					{selectedProducto ? "Guardar Cambios" : "Crear Carta"}
 				  </Button>
 				</DialogFooter>
 			  </DialogContent>
@@ -413,7 +330,6 @@ export default function ProductoPage() {
 					  {[
 						"-created_at","created_at",
 						"-id","id",
-						"-precio","precio",
 						"-nombre","nombre",
 					  ].map((opt) => (
 						<SelectItem key={opt} value={opt}>{opt}</SelectItem>
@@ -454,48 +370,41 @@ export default function ProductoPage() {
 			  <TableHeader>
 				<TableRow>
 				  <TableHead>ID</TableHead>
-				  <TableHead>Tipo</TableHead>
 				  <TableHead>Nombre</TableHead>
-				  <TableHead>Precio</TableHead>
-				  <TableHead>Descripcion</TableHead>
 				  <TableHead className="text-right">Acciones</TableHead>
 				</TableRow>
 			  </TableHeader>
 			  <TableBody>
-				{productos.map((producto) => (
-				  <TableRow key={producto.id}>
-					<TableCell className="font-medium">{producto.id}</TableCell>
-					<TableCell>{producto.tipo}</TableCell>
-					<TableCell>{producto.nombre}</TableCell>
-					<TableCell>{producto.precio}</TableCell>
-					<TableCell>{producto.descripcion}</TableCell>
-					<TableCell>
+				{cartas.map((carta) => (
+				  <TableRow key={carta.id}>
+					<TableCell className="font-medium">{carta.id}</TableCell>
+					<TableCell>{carta.nombre}</TableCell>
 					  <span
 						className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-						  producto.activo
+						  carta.baja
 							? "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400" 
 							: "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
 						}`}
 					  >
-						{producto.activo ? "Inactivo" : "Activo"}
+						{carta.baja ? "Activo" : "Inactivo"}
 					  </span>
 					</TableCell>
 					<TableCell className="text-right">
 					  <div className="flex justify-end gap-2">
-						<Button variant="ghost" size="icon" onClick={() => handleOpenDialog(producto)}>
+						<Button variant="ghost" size="icon" onClick={() => handleOpenDialog(carta)}>
 						  <Pencil className="h-4 w-4" />
 						</Button>
-						<Button variant="ghost" size="icon" onClick={() => openDeleteDialog(producto.id)}>
+						<Button variant="ghost" size="icon" onClick={() => openDeleteDialog(carta.id)}>
 						  <Trash2 className="h-4 w-4 text-destructive" />
 						</Button>
 					  </div>
 					</TableCell>
 				  </TableRow>
 				))}
-				{!loading && productos.length === 0 && (
+				{!loading && cartas.length === 0 && (
 				  <TableRow>
 					<TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-					  No hay productos cargados.
+					  No hay cartas cargadas.
 					</TableCell>
 				  </TableRow>
 				)}
@@ -618,7 +527,7 @@ export default function ProductoPage() {
 			  <AlertDialogHeader>
 				<AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
 				<AlertDialogDescription>
-				  Esta acción no se puede deshacer. El producto será eliminado permanentemente del sistema.
+				  Esta acción no se puede deshacer. La carta será eliminada permanentemente del sistema.
 				</AlertDialogDescription>
 			  </AlertDialogHeader>
 			  <AlertDialogFooter>

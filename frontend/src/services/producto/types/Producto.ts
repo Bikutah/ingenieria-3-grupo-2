@@ -6,4 +6,5 @@ export type Producto = {
 	descripcion: string;
 	cm3: number;
 	activo: boolean;
+    idcarta: number;
 }
