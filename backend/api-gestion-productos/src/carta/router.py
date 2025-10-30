@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
@@ -12,13 +12,13 @@ from fastapi_pagination.ext.sqlalchemy import paginate
 
 router = APIRouter()
 
-@router.post("/", response_model=schemas.CartaOut)
+@router.post("/", response_model=schemas.CartaOut, status_code=status.HTTP_201_CREATED)
 def create(payload: schemas.CartaCreate, db: Session = Depends(get_db)):
     # Verificar que el nombre de la carta sea único
     carta_existente = db.query(models.Carta).filter(models.Carta.nombre == payload.nombre).first()
     if carta_existente:
         raise HTTPException(
-            status_code=409,
+            status_code=status.HTTP_409_CONFLICT,
             detail=f"Ya existe una carta con el nombre '{payload.nombre}'"
         )
 

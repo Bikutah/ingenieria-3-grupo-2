@@ -13,7 +13,7 @@ from fastapi_pagination.ext.sqlalchemy import paginate
 
 router = APIRouter()
 
-@router.post("/", response_model=schemas.ProductosOut)
+@router.post("/", response_model=schemas.ProductosOut, status_code=status.HTTP_201_CREATED)
 def create(payload: schemas.ProductosCreate, db: Session = Depends(get_db)):
     # Verificar que el nombre del producto sea único
     producto_existente = db.query(models.Productos).filter(models.Productos.nombre == payload.nombre).first()
