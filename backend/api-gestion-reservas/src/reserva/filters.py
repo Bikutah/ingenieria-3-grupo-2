@@ -10,6 +10,7 @@ class ReservaFilter(Filter):
     id__lte: Optional[int] = None
     
     # Filtros por fecha
+    fecha: Optional[str] = None
     fecha__gte: Optional[str] = None
     fecha__lte: Optional[str] = None
     fecha__gt: Optional[str] = None

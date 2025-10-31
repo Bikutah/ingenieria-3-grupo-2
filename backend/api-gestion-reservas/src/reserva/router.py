@@ -159,7 +159,7 @@ def get_menu_reservas(id_reserva: int, db: Session = Depends(get_db)):
     if reserva is None:
         raise HTTPException(status_code=404, detail="Reserva no encontrada")
 
-    return reserva.menu_reservas
+    return [reserva.menu_reserva] if reserva.menu_reserva else []
 
 @router.put("/{id_reserva}/menu-reservas/{id_menu_reserva}/detalles/{id_detalle}", response_model=schemas.DetalleMenuOut)
 def update_detalle_menu(
