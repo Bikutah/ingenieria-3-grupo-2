@@ -50,7 +50,8 @@ def modify(id_: int, payload: schemas.ComandaCreate, db: Session = Depends(get_d
     if obj is None:
         raise HTTPException(status_code=404, detail="Comanda no encontrado")
     
-    update_data = payload.model_dump(exclude_unset=True)
+    # Excluir detalles_comanda del update (solo se modifican campos de la comanda principal)
+    update_data = payload.model_dump(exclude_unset=True, exclude={"detalles_comanda"})
     for key, value in update_data.items():
         setattr(obj, key, value)
     db.commit()

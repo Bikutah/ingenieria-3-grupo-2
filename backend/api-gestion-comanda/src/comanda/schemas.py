@@ -24,7 +24,7 @@ class ComandaBase(BaseModel):
     baja: bool = False
 
 class ComandaCreate(ComandaBase):
-    detalles_comanda: List[DetalleComandaCreate] = Field(..., min_items=1)
+    detalles_comanda: List[DetalleComandaCreate] = Field(..., min_length=1)
 
 class ComandaOut(ComandaBase):
     id: int
