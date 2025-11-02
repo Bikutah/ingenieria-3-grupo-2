@@ -63,3 +63,14 @@ services:
     restart: always
     env_file:
       - ../backend/api-gestion-reservas/.env
+  gestion-comanda:
+    build:
+      context: ../backend/api-gestion-comanda
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8000"
+    volumes:
+      - ../backend/api-gestion-comanda:/app
+    restart: always
+    env_file:
+      - ../backend/api-gestion-comanda/.env
