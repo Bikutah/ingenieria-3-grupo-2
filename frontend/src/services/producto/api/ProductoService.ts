@@ -5,7 +5,7 @@ const DEFAULT_BASE = "/gestion-productos";
 
 export const productoService = {
   
-  async list(params: { q?: string; page?: number; size?: number; id?: number, tipo: string, nombre__ilike?: string, precio__gte?: number, precio__lte?: number, baja?: boolean, order_by?: string }) {
+  async list(params: { q?: string; page?: number; size?: number; id?: number, tipo?: string, nombre__ilike?: string, precio__gte?: number, precio__lte?: number, baja?: boolean, order_by?: string }) {
     const res = await request<{ items: Producto[]; total: number; pages: number; size: number; page: number }>({
       method: "GET",
       url: "/productos/",

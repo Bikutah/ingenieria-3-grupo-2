@@ -1,14 +1,14 @@
 import { request } from "@/config/http/httpClient";
-import { type Producto } from "@/services/producto/types/Carta";
+import { type Carta } from "@/services/carta/types/Carta";
 
 const DEFAULT_BASE = "/gestion-productos";
 
-export const productoService = {
+export const cartaService = {
   
   async list(params: { q?: string; page?: number; size?: number; id?: number, nombre__ilike?: string, baja?: boolean, order_by?: string }) {
     const res = await request<{ items: Carta[]; total: number; pages: number; size: number; page: number }>({
       method: "GET",
-      url: "/cartas/",
+      url: "/carta/",
       params,
       baseURL: DEFAULT_BASE,
     });
@@ -17,18 +17,18 @@ export const productoService = {
   },
 
   async getById(id: number) {
-    const res = await request<Producto>({
+    const res = await request<Carta>({
       method: "GET",
-      url: `/cartas/${id}`,
+      url: `/carta/${id}`,
       baseURL: DEFAULT_BASE,
     });
     return res.data;
   },
 
   async create(data: Omit<Carta, "id">) {
-    const res = await request<Producto>({
+    const res = await request<Carta>({
       method: "POST",
-      url: "/cartas/",
+      url: "/carta/",
       data,
       baseURL: DEFAULT_BASE,
     });
@@ -36,9 +36,9 @@ export const productoService = {
   },
 
   async update(id: number, data: Partial<Omit<Carta, "id">>) {
-    const res = await request<Producto>({
+    const res = await request<Carta>({
       method: "PUT",
-      url: `/cartas/${id}`,
+      url: `/carta/${id}`,
       data,
       baseURL: DEFAULT_BASE,
     });
@@ -48,7 +48,7 @@ export const productoService = {
   async remove(id: number) {
     await request({
       method: "DELETE",
-      url: `/cartas/${id}`,
+      url: `/carta/${id}`,
       baseURL: DEFAULT_BASE,
     });
   },
