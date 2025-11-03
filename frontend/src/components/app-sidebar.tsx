@@ -64,8 +64,8 @@ const itemsGestiones = [
     icon: Ham,
   },
   {
-    title: "Secciones",
-    url: "#",
+    title: "Cartas",
+    url: "cartas",
     icon: LayoutTemplate,
   },
 ]

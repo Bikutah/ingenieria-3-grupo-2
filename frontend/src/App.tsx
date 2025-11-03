@@ -8,6 +8,7 @@ import MesasPage from './pages/mesas/MesasPage';
 import SectoresPage from './pages/sectores/SectoresPage';
 import ReservasPage from './pages/reservas/ReservasPage';
 import { Toaster } from "sonner"
+import CartaPage from './pages/carta/CartaPage';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           <Route path="mesas" element={<MesasPage />} />
           <Route path="sectores" element={<SectoresPage />} />
           <Route path="reservas" element={<ReservasPage />} />
+          <Route path="cartas" element={<CartaPage />} />
         </Route>
         
         {/* Ruta para "Página no encontrada" (404) */}
