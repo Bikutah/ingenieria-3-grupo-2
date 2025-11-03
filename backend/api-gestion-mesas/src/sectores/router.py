@@ -15,6 +15,13 @@ router = APIRouter()
 
 @router.post("/", response_model=schemas.SectoresOut)
 def create(payload: schemas.SectoresCreate, db: Session = Depends(get_db)):
+    # Validar número único
+    existe = db.query(models.Sectores).filter(
+        models.Sectores.numero == payload.numero
+    ).first()
+    if existe:
+        raise HTTPException(status_code=409, detail="Número de sector ya registrado")
+
     db_obj = models.Sectores(nombre=payload.nombre, numero=payload.numero)
     db.add(db_obj)
     db.commit()

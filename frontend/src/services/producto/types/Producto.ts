@@ -4,6 +4,7 @@ export type Producto = {
 	nombre: string;
 	precio: number;
 	descripcion: string;
-	cm3: number;
-	activo: boolean;
+	cm3?: number;
+	baja: boolean;
+    id_carta: number;
 }

@@ -64,8 +64,8 @@ const itemsGestiones = [
     icon: Ham,
   },
   {
-    title: "Secciones",
-    url: "#",
+    title: "Cartas",
+    url: "cartas",
     icon: LayoutTemplate,
   },
 ]
@@ -74,7 +74,7 @@ const itemsGestiones = [
 const itemsFunciones = [
   {
     title: "Reservas",
-    url: "#",
+    url: "reservas",
     icon: NotebookTabs,
   },
   {
