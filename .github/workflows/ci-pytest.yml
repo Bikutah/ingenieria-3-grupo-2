@@ -1,3 +1,4 @@
+# .github/workflows/ci-pytest.yml
 name: CI - PyTest (monorepo)
 
 on:
@@ -15,32 +16,26 @@ jobs:
       matrix: ${{ steps.mk-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
-
       - id: mk-matrix
-        name: Build dynamic matrix (find api dirs)
         shell: bash
         run: |
           python - <<'PY' > matrix.json
           import os, json
-          apis = []
+          apis=set()
           for root, dirs, files in os.walk("."):
-              parts = root.strip("./").split("/")
-              # ignora .git y la carpeta .github
-              if any(p.startswith(".git") or p == ".github" for p in parts):
+              # ignorar carpetas ocultas y .github
+              if "/.github" in root or "/." in root or root.startswith("./."):
                   continue
-              # heurística mínima: carpeta que contenga tests o meta de proyecto python
-              if ("tests" in dirs) or any(f in files for f in ("pytest.ini","pyproject.toml","requirements.txt")):
-                  # evitá la raíz del repo si no es una api
-                  if root != ".":
-                      apis.append(root)
-          # dedup + orden
-          apis = sorted(set(apis))
-          print(json.dumps({"api": apis}))
+              has_tests = "tests" in dirs
+              has_meta  = any(f in files for f in ("pytest.ini","pyproject.toml","requirements.txt"))
+              if root != "." and (has_tests or has_meta):
+                  apis.add(root.strip("./"))
+          print(json.dumps({"api": sorted(apis)}))
           PY
           echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
           echo "Discovered matrix:"; cat matrix.json
 
-  test:
+  pytest:
     name: pytest (${{ matrix.api }})
     needs: discover-apis
     if: ${{ toJson(fromJson(needs.discover-apis.outputs.matrix).api) != '[]' }}
@@ -48,6 +43,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.discover-apis.outputs.matrix) }}
+    env:
+      DATABASE_URL: sqlite:///./test.db
+      PYTEST_ADDOPTS: -q
     steps:
       - uses: actions/checkout@v4
 
@@ -68,20 +66,19 @@ jobs:
           if [ -f pyproject.toml ]; then pip install .; fi
           pip install pytest
 
-      - name: Run pytest -q
+      - name: Run pytest
         working-directory: ${{ matrix.api }}
-        run: |
-          pytest -q
+        run: pytest
 
-  all-tests:
+  gate:
     name: ✅ All PyTests passed
-    needs: test
-    if: ${{ always() }}
+    needs: pytest
     runs-on: ubuntu-latest
+    if: ${{ always() }}
     steps:
       - name: Check matrix results
         run: |
-          if [ "${{ needs.test.result }}" != "success" ]; then
+          if [ "${{ needs.pytest.result }}" != "success" ]; then
             echo "Some API tests failed"; exit 1
           fi
           echo "All matrix jobs passed"
