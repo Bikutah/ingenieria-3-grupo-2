@@ -28,6 +28,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/gestion-reservas/, ''),
       },
+      '/gestion-comanda': {
+        target: 'http://gestion-comanda:8000',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/gestion-comanda/, ''),
+      },
     },
   },
   resolve: {

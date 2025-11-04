@@ -79,7 +79,7 @@ const itemsFunciones = [
   },
   {
     title: "Comandas",
-    url: "#",
+    url: "comandas",
     icon: ClipboardList,
   },
   {
