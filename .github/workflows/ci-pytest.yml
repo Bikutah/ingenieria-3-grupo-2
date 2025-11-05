@@ -4,13 +4,16 @@ name: CI - PyTest (monorepo)
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-pytest.yml'
 
 permissions:
   contents: read
 
 jobs:
   discover-apis:
-    name: Discover APIs
+    name: Discover APIs (backend/)
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.mk-matrix.outputs.matrix }}
@@ -21,15 +24,24 @@ jobs:
         run: |
           python - <<'PY' > matrix.json
           import os, json
-          apis=set()
-          for root, dirs, files in os.walk("."):
-              # ignorar carpetas ocultas y .github
-              if "/.github" in root or "/." in root or root.startswith("./."):
-                  continue
-              has_tests = "tests" in dirs
-              has_meta  = any(f in files for f in ("pytest.ini","pyproject.toml","requirements.txt"))
-              if root != "." and (has_tests or has_meta):
-                  apis.add(root.strip("./"))
+
+          base_dir = "backend"
+          apis = set()
+
+          for root, dirs, files in os.walk(base_dir):
+              # filtrar dirs: nada oculto, sin __pycache__ ni .github
+              dirs[:] = [d for d in dirs if not d.startswith('.')
+                                       and d != '__pycache__'
+                                       and d != '.github']
+
+              has_tests = 'tests' in dirs
+              has_meta  = any(f in files for f in ('pytest.ini','pyproject.toml','requirements.txt'))
+
+              # evitar tomar el propio base_dir si no es un proyecto en sí
+              if root != base_dir and (has_tests or has_meta):
+                  rel = os.path.relpath(root, '.')  # p.ej. backend/mi-api
+                  apis.add(rel)
+
           print(json.dumps({"api": sorted(apis)}))
           PY
           echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
@@ -44,6 +56,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.discover-apis.outputs.matrix) }}
     env:
+      # usa una DB local por API; si tu app lee DATABASE_URL, esto evita el ValidationError
       DATABASE_URL: sqlite:///./test.db
       PYTEST_ADDOPTS: -q
     steps:
