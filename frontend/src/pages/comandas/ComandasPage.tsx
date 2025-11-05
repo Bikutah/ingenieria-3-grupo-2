@@ -80,7 +80,7 @@ import { extractApiErrorMessage } from "@/lib/api-error"
 const PAGE_SIZE = 50
 
 type ComandaExtended = Comanda & {
-  detalles?: DetalleComanda[]
+  detalles_comanda?: DetalleComanda[] // Se usa detalles_comanda para consistencia con el backend y formData
 }
 
 export default function ComandasPage() {
@@ -145,7 +145,8 @@ export default function ComandasPage() {
     
     // id_reserva es opcional, puede ser 0
     
-    const tieneProductos = (data.detalles ?? []).some(d => (d.cantidad ?? 0) > 0)
+    // CORRECCIÓN: Usar detalles_comanda en la validación
+    const tieneProductos = (data.detalles_comanda ?? []).some(d => (d.cantidad ?? 0) > 0)
     if (!tieneProductos) {
       errors.detalles = "Agregá al menos un producto con cantidad > 0"
     }
@@ -251,7 +252,8 @@ export default function ComandasPage() {
     const t = setTimeout(() => {
       if (mozoOpen) loadMozos(mozoQuery)
     }, 300)
-    return () => clearTimeout(t)
+    // CORRECCIÓN: Agregar la función de limpieza completa para evitar el error de sintaxis
+    return () => clearTimeout(t) 
   }, [mozoQuery, mozoOpen, loadMozos])
 
   useEffect(() => {
@@ -302,8 +304,9 @@ export default function ComandasPage() {
   const [productoOpen, setProductoOpen] = useState(false)
   const [productoQuery, setProductoQuery] = useState("")
   
+  // CORRECCIÓN: Usar detalles_comanda para los IDs seleccionados
   const selectedIds = new Set(
-    formData.detalles?.map(d => d.id_producto) ?? []
+    formData.detalles_comanda?.map(d => d.id_producto) ?? []
   )
 
   const productoLabel = (p: Producto) =>
@@ -341,22 +344,40 @@ export default function ComandasPage() {
   // Agregar producto al detalle
   const addOrIncProducto = (prodId: number, prodPrecio: number) => {
     setFormData(fd => {
-      const detalles = [...(fd.detalles ?? [])]
-      const idx = detalles.findIndex(d => d.id_producto === prodId)
+      // CORRECCIÓN: Usar detalles_comanda
+      const detalles_comanda = [...(fd.detalles_comanda ?? [])]
+      const idx = detalles_comanda.findIndex(d => d.id_producto === prodId)
       if (idx >= 0) {
-        detalles[idx] = { ...detalles[idx], cantidad: (detalles[idx].cantidad ?? 0) + 1 }
+        detalles_comanda[idx] = { ...detalles_comanda[idx], cantidad: (detalles_comanda[idx].cantidad ?? 0) + 1 }
       } else {
-        detalles.push({ 
+        detalles_comanda.push({ 
           id: 0, // temporal, el backend asigna el id
           id_producto: prodId, 
           cantidad: 1, 
           precio_unitario: prodPrecio 
         })
       }
-      return { ...fd, detalles }
+      // CORRECCIÓN: Devolver detalles_comanda
+      return { ...fd, detalles_comanda }
     })
   }
-
+  useEffect(() => {
+    if (isDialogOpen && selectedComanda) {
+      // Si la lista de mesas está vacía o el ID de la mesa no está cargado
+      if (mesas.length === 0 || !mesas.find(m => m.id === formData.id_mesa)) {
+        loadMesas();
+      }
+      // Si la lista de mozos está vacía o el ID del mozo no está cargado
+      if (mozos.length === 0 || !mozos.find(m => m.id === formData.id_mozo)) {
+        loadMozos();
+      }
+      // Si la lista de reservas está vacía o el ID de la reserva no está cargado (solo si es > 0)
+      if (formData.id_reserva > 0 && (reservas.length === 0 || !reservas.find(r => r.id === formData.id_reserva))) {
+        loadReservas();
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDialogOpen, selectedComanda, formData.id_mesa, formData.id_mozo, formData.id_reserva, loadMesas, loadMozos, loadReservas]);
   // Cargar lista inicial
   useEffect(() => {
     let mounted = true
@@ -370,6 +391,11 @@ export default function ComandasPage() {
         setPage(data.page ?? 1)
         setPages(data.pages)
         setSize(data.size ?? PAGE_SIZE)
+        
+        // 🛑 AÑADIR: Cargar las dependencias necesarias para mostrar los nombres/tipos
+        await loadMozos()
+        await loadMesas()
+
       } catch (e) {
         console.error("Error cargando comandas:", e)
       } finally {
@@ -380,30 +406,47 @@ export default function ComandasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleOpenDialog = (comanda?: Comanda) => {
-    if (comanda) {
-      setSelectedComanda(comanda)
-      setFormData({
-        fecha: comanda.fecha,
-        id_mesa: comanda.id_mesa,
-        id_mozo: comanda.id_mozo,
-        id_reserva: comanda.id_reserva,
-        baja: comanda.baja,
-        detalles_comanda: [],
-      })
-    } else {
-      setSelectedComanda(null)
-      setFormData({
-        fecha: "",
-        id_mesa: 0,
-        id_mozo: 0,
-        id_reserva: 0,
-        baja: false,
-        detalles_comanda: [],
-      })
-    }
+  // CORRECCIÓN: Implementación de la carga asíncrona de detalles para edición
+  const handleOpenDialog = async (comanda?: Comanda) => {
     setTouched({})
     setIsDialogOpen(true)
+    setSelectedComanda(null)
+
+    // Estado inicial limpio
+    setFormData({
+      fecha: "",
+      id_mesa: 0,
+      id_mozo: 0,
+      id_reserva: 0,
+      baja: false,
+      detalles_comanda: [],
+    })
+
+    if (comanda) {
+      setSelectedComanda(comanda)
+      setLoading(true) // Usamos loading para bloquear la interfaz mientras se carga
+      try {
+        // Obtener la comanda con sus detalles
+        const fullComanda = await comandasService.getById(comanda.id)
+
+        // Setear el estado del formulario con los datos completos
+        setFormData({
+          fecha: fullComanda.fecha,
+          id_mesa: fullComanda.id_mesa,
+          id_mozo: fullComanda.id_mozo,
+          id_reserva: fullComanda.id_reserva,
+          baja: fullComanda.baja,
+          // Precargar los detalles de la comanda
+          detalles_comanda: fullComanda.detalles_comanda ?? [],
+        })
+      } catch (e) {
+        console.error("Error cargando detalles de comanda:", e)
+        toast.error("No se pudieron cargar los detalles para edición.", { description: extractApiErrorMessage(e) })
+        setIsDialogOpen(false) // Cerrar si falla la carga
+      } finally {
+        setLoading(false)
+      }
+    }
   }
 
   const handleSave = async () => {
@@ -425,7 +468,9 @@ export default function ComandasPage() {
     id_mozo: formData.id_mozo,
     id_reserva: formData.id_reserva || 0,
     baja: formData.baja,
-    detalles_comanda: formData.detalles?.map(d => ({
+    // Usar detalles_comanda en el payload
+    detalles_comanda: formData.detalles_comanda?.map(d => ({
+        id: d.id,
         id_producto: d.id_producto,
         cantidad: d.cantidad,
         precio_unitario: d.precio_unitario,
@@ -488,7 +533,7 @@ export default function ComandasPage() {
               Nueva Comanda
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{selectedComanda ? "Modificar Comanda" : "Nueva Comanda"}</DialogTitle>
               <DialogDescription>
@@ -761,10 +806,11 @@ export default function ComandasPage() {
                 </Popover>
 
                 {/* Lista de productos seleccionados */}
-                {formData.detalles?.length ? (
+                {/* CORRECCIÓN: Usar detalles_comanda aquí */}
+                {formData.detalles_comanda?.length ? (
                   <div className="rounded-md border">
                     <Table>
-                                              <TableHeader>
+                      <TableHeader>
                         <TableRow>
                           <TableHead>Producto</TableHead>
                           <TableHead className="text-center">Cant.</TableHead>
@@ -772,7 +818,7 @@ export default function ComandasPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {formData.detalles.map((d) => {
+                        {formData.detalles_comanda.map((d) => {
                           const prod = productos.find(pp => pp.id === d.id_producto)
                           const label = prod ? productoLabel(prod) : `#${d.id_producto}`
                           return (
@@ -787,10 +833,12 @@ export default function ComandasPage() {
                                   onChange={(e) => {
                                     const qty = Math.max(0, Number(e.target.value || 0))
                                     setFormData(fd => {
-                                      const copy = (fd.detalles ?? []).map(x =>
+                                      // CORRECCIÓN: Usar detalles_comanda
+                                      const copy = (fd.detalles_comanda ?? []).map(x =>
                                         x.id_producto === d.id_producto ? { ...x, cantidad: qty } : x
                                       )
-                                      return { ...fd, detalles: copy }
+                                      // CORRECCIÓN: Devolver detalles_comanda
+                                      return { ...fd, detalles_comanda: copy }
                                     })
                                   }}
                                 />
@@ -802,7 +850,8 @@ export default function ComandasPage() {
                                   onClick={() => {
                                     setFormData(fd => ({
                                       ...fd,
-                                      detalles: (fd.detalles ?? []).filter(x => x.id_producto !== d.id_producto)
+                                      // CORRECCIÓN: Usar detalles_comanda
+                                      detalles_comanda: (fd.detalles_comanda ?? []).filter(x => x.id_producto !== d.id_producto)
                                     }))
                                   }}
                                 >
@@ -904,36 +953,51 @@ export default function ComandasPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {comandas.map((comanda) => (
-              <TableRow key={comanda.id}>
-                <TableCell className="font-medium">{comanda.id}</TableCell>
-                <TableCell>{comanda.fecha}</TableCell>
-                <TableCell>{comanda.id_mesa}</TableCell>
-                <TableCell>{comanda.id_mozo}</TableCell>
-                <TableCell>{comanda.id_reserva || "-"}</TableCell>
-                <TableCell>
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      comanda.baja
-                        ? "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
-                        : "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                    }`}
-                  >
-                    {comanda.baja ? "Cancelada" : "Activa"}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(comanda)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(comanda.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+            {comandas.map((comanda) => {
+              // Búsqueda del mozo y la mesa por ID
+              const mozo = mozos.find(m => m.id === comanda.id_mozo);
+              const mesa = mesas.find(m => m.id === comanda.id_mesa);
+              
+              // Determinar la etiqueta a mostrar
+              const mozoDisplay = mozo ? `${mozo.nombre} ${mozo.apellido}` : `#${comanda.id_mozo}`;
+              const mesaDisplay = mesa ? `${mesa.tipo} (${mesa.numero})` : `#${comanda.id_mesa}`;
+
+              return (
+                <TableRow key={comanda.id}>
+                  <TableCell className="font-medium">{comanda.id}</TableCell>
+                  <TableCell>{comanda.fecha}</TableCell>
+                  
+                  {/* 🛑 MOSTRAR TIPO Y NÚMERO DE MESA */}
+                  <TableCell>{mesaDisplay}</TableCell>
+                  
+                  {/* 🛑 MOSTRAR NOMBRE Y APELLIDO DEL MOZO */}
+                  <TableCell>{mozoDisplay}</TableCell>
+                  
+                  <TableCell>{comanda.id_reserva || "-"}</TableCell>
+                  <TableCell>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                        comanda.baja
+                          ? "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
+                          : "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+                      }`}
+                    >
+                      {comanda.baja ? "Cancelada" : "Activa"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(comanda)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(comanda.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
             {!loading && comandas.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
