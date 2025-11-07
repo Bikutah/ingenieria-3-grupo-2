@@ -1,0 +1,465 @@
+import pytest
+from fastapi.testclient import TestClient
+from datetime import datetime
+from unittest.mock import patch, AsyncMock
+
+# --- Solución al problema de importación ---
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from src.main import app
+from src.database import Base, get_db
+from src.factura import models
+
+# --- Configuración de la Base de Datos de Prueba ---
+# Usamos una base de datos SQLite en memoria para los tests
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,  # Deshabilita el pooling de conexiones para SQLite en memoria
+)
+
+# Creamos una sesión de prueba
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# --- Sobrescribir la Dependencia de la Base de Datos ---
+# Esta función reemplazará a `get_db` durante los tests
+def override_get_db():
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Le decimos a la app de FastAPI que use nuestra BD de prueba
+app.dependency_overrides[get_db] = override_get_db
+
+# --- Fixture de Pytest para el Cliente de Test ---
+# Este fixture se ejecutará antes de cada test
+@pytest.fixture()
+def client():
+    # Crea todas las tablas en la base de datos en memoria
+    Base.metadata.create_all(bind=engine)
+
+    # Yield es como un return, pero el código continúa después de que el test termina
+    yield TestClient(app)
+
+    # Limpia la base de datos después de cada test
+    Base.metadata.drop_all(bind=engine)
+
+# --- Tests para el endpoint de Facturas ---
+
+@patch('src.factura.validator.FacturaValidator.validar_comanda_existe')
+def test_crear_factura_exitoso(mock_validar_comanda, client):
+    """
+    Test para verificar la creación exitosa de una factura.
+    """
+    # Mockear la validación de comanda
+    mock_validar_comanda.return_value = {"id": 1, "fecha": "2025-01-01"}  # Simula comanda existente
+
+    # Datos de factura válidos
+    factura_data = {
+        "id_comanda": 1,
+        "total": 250000,
+        "medio_pago": "transferencia",
+        "detalles_factura": [
+            {
+                "id_producto": 1,
+                "cantidad": 1,
+                "precio_unitario": 200000,
+                "subtotal": 200000
+            },
+            {
+                "id_producto": 2,
+                "cantidad": 1,
+                "precio_unitario": 50000,
+                "subtotal": 50000
+            }
+        ]
+    }
+
+    response = client.post("/factura/", json=factura_data)
+
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert data["id_comanda"] == 1
+    assert data["total"] == 250000
+    assert data["medio_pago"] == "transferencia"
+    assert data["estado"] == "pendiente"
+    assert "id" in data
+    assert "fecha_emision" in data
+    assert len(data["detalles_factura"]) == 2
+
+@patch('src.factura.validator.FacturaValidator.validar_comanda_existe')
+def test_crear_factura_sin_detalles(mock_validar_comanda, client):
+    """
+    Test para verificar que no se puede crear factura sin detalles.
+    """
+    mock_validar_comanda.return_value = {"id": 1, "fecha": "2025-01-01"}
+
+    factura_data = {
+        "id_comanda": 1,
+        "total": 100000,
+        "medio_pago": "efectivo",
+        "detalles_factura": []  # Lista vacía
+    }
+
+    response = client.post("/factura/", json=factura_data)
+    assert response.status_code == 422  # Error de validación por min_length=1
+
+@patch('src.factura.validator.FacturaValidator.validar_comanda_existe')
+def test_obtener_lista_de_facturas(mock_validar_comanda, client):
+    """
+    Test para verificar que se puede obtener una lista paginada de facturas.
+    """
+    mock_validar_comanda.return_value = {"id": 1, "fecha": "2025-01-01"}
+
+    # Crear facturas de prueba
+    client.post("/factura/", json={
+        "id_comanda": 1,
+        "total": 100000,
+        "medio_pago": "efectivo",
+        "detalles_factura": [
+            {
+                "id_producto": 1,
+                "cantidad": 1,
+                "precio_unitario": 100000,
+                "subtotal": 100000
+            }
+        ]
+    })
+    client.post("/factura/", json={
+        "id_comanda": 2,
+        "total": 200000,
+        "medio_pago": "transferencia",
+        "detalles_factura": [
+            {
+                "id_producto": 2,
+                "cantidad": 1,
+                "precio_unitario": 200000,
+                "subtotal": 200000
+            }
+        ]
+    })
+
+    response = client.get("/factura/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 2
+    assert len(data["items"]) == 2
+
+@patch('src.factura.validator.FacturaValidator.validar_comanda_existe')
+def test_filtrar_facturas_por_estado(mock_validar_comanda, client):
+    """
+    Test para verificar el filtro de facturas por estado.
+    """
+    mock_validar_comanda.return_value = {"id": 1, "fecha": "2025-01-01"}
+
+    # Crear facturas con diferentes estados
+    response1 = client.post("/factura/", json={
+        "id_comanda": 1,
+        "total": 100000,
+        "medio_pago": "efectivo",
+        "detalles_factura": [
+            {
+                "id_producto": 1,
+                "cantidad": 1,
+                "precio_unitario": 100000,
+                "subtotal": 100000
+            }
+        ]
+    })
+    factura_id = response1.json()["id"]
+
+    # Cambiar una factura a pagada
+    client.put(f"/factura/{factura_id}/pagar")
+
+    # Crear otra factura pendiente
+    client.post("/factura/", json={
+        "id_comanda": 2,
+        "total": 200000,
+        "medio_pago": "transferencia",
+        "detalles_factura": [
+            {
+                "id_producto": 2,
+                "cantidad": 1,
+                "precio_unitario": 200000,
+                "subtotal": 200000
+            }
+        ]
+    })
+
+    # Filtrar por estado pendiente
+    response = client.get("/factura/?estado=pendiente")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1  # Solo una factura pendiente
+    assert data["items"][0]["estado"] == "pendiente"
+
+@patch('src.factura.validator.FacturaValidator.validar_comanda_existe')
+def test_filtrar_facturas_por_comanda(mock_validar_comanda, client):
+    """
+    Test para verificar el filtro de facturas por id_comanda.
+    """
+    mock_validar_comanda.return_value = {"id": 1, "fecha": "2025-01-01"}
+
+    # Crear facturas para diferentes comandas
+    client.post("/factura/", json={
+        "id_comanda": 1,
+        "total": 100000,
+        "medio_pago": "efectivo",
+        "detalles_factura": [
+            {
+                "id_producto": 1,
+                "cantidad": 1,
+                "precio_unitario": 100000,
+                "subtotal": 100000
+            }
+        ]
+    })
+    client.post("/factura/", json={
+        "id_comanda": 2,
+        "total": 200000,
+        "medio_pago": "transferencia",
+        "detalles_factura": [
+            {
+                "id_producto": 2,
+                "cantidad": 1,
+                "precio_unitario": 200000,
+                "subtotal": 200000
+            }
+        ]
+    })
+
+    # Filtrar por id_comanda=1
+    response = client.get("/factura/?id_comanda=1")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["id_comanda"] == 1
+
+@patch('src.factura.validator.FacturaValidator.validar_comanda_existe')
+def test_marcar_factura_como_pagada(mock_validar_comanda, client):
+    """
+    Test para verificar el cambio de estado a pagada.
+    """
+    mock_validar_comanda.return_value = {"id": 1, "fecha": "2025-01-01"}
+
+    # Crear factura
+    response_creacion = client.post("/factura/", json={
+        "id_comanda": 1,
+        "total": 100000,
+        "medio_pago": "efectivo",
+        "detalles_factura": [
+            {
+                "id_producto": 1,
+                "cantidad": 1,
+                "precio_unitario": 100000,
+                "subtotal": 100000
+            }
+        ]
+    })
+    factura_id = response_creacion.json()["id"]
+
+    # Marcar como pagada
+    response = client.put(f"/factura/{factura_id}/pagar")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["estado"] == "pagada"
+
+    # Verificar que persiste
+    response_get = client.get(f"/factura/{factura_id}")
+    assert response_get.json()["estado"] == "pagada"
+
+@patch('src.factura.validator.FacturaValidator.validar_comanda_existe')
+def test_marcar_factura_como_cancelada(mock_validar_comanda, client):
+    """
+    Test para verificar el cambio de estado a cancelada.
+    """
+    mock_validar_comanda.return_value = {"id": 1, "fecha": "2025-01-01"}
+
+    # Crear factura
+    response_creacion = client.post("/factura/", json={
+        "id_comanda": 1,
+        "total": 100000,
+        "medio_pago": "efectivo",
+        "detalles_factura": [
+            {
+                "id_producto": 1,
+                "cantidad": 1,
+                "precio_unitario": 100000,
+                "subtotal": 100000
+            }
+        ]
+    })
+    factura_id = response_creacion.json()["id"]
+
+    # Marcar como cancelada
+    response = client.put(f"/factura/{factura_id}/cancelar")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["estado"] == "cancelada"
+
+@patch('src.factura.validator.FacturaValidator.validar_comanda_existe')
+def test_marcar_factura_como_anulada(mock_validar_comanda, client):
+    """
+    Test para verificar el cambio de estado a anulada.
+    """
+    mock_validar_comanda.return_value = {"id": 1, "fecha": "2025-01-01"}
+
+    # Crear factura
+    response_creacion = client.post("/factura/", json={
+        "id_comanda": 1,
+        "total": 100000,
+        "medio_pago": "efectivo",
+        "detalles_factura": [
+            {
+                "id_producto": 1,
+                "cantidad": 1,
+                "precio_unitario": 100000,
+                "subtotal": 100000
+            }
+        ]
+    })
+    factura_id = response_creacion.json()["id"]
+
+    # Marcar como anulada
+    response = client.put(f"/factura/{factura_id}/anular")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["estado"] == "anulada"
+
+@patch('src.factura.validator.FacturaValidator.validar_comanda_existe')
+def test_no_pagar_factura_ya_pagada(mock_validar_comanda, client):
+    """
+    Test para verificar que no se puede pagar una factura ya pagada.
+    """
+    mock_validar_comanda.return_value = {"id": 1, "fecha": "2025-01-01"}
+
+    # Crear y pagar factura
+    response_creacion = client.post("/factura/", json={
+        "id_comanda": 1,
+        "total": 100000,
+        "medio_pago": "efectivo",
+        "detalles_factura": [
+            {
+                "id_producto": 1,
+                "cantidad": 1,
+                "precio_unitario": 100000,
+                "subtotal": 100000
+            }
+        ]
+    })
+    factura_id = response_creacion.json()["id"]
+    client.put(f"/factura/{factura_id}/pagar")
+
+    # Intentar pagar nuevamente
+    response = client.put(f"/factura/{factura_id}/pagar")
+    assert response.status_code == 400
+    assert "No se puede cambiar el estado" in response.json()["detail"]
+
+@patch('src.factura.validator.FacturaValidator.validar_comanda_existe')
+def test_no_cancelar_factura_ya_pagada(mock_validar_comanda, client):
+    """
+    Test para verificar que no se puede cancelar una factura ya pagada.
+    """
+    mock_validar_comanda.return_value = {"id": 1, "fecha": "2025-01-01"}
+
+    # Crear y pagar factura
+    response_creacion = client.post("/factura/", json={
+        "id_comanda": 1,
+        "total": 100000,
+        "medio_pago": "efectivo",
+        "detalles_factura": [
+            {
+                "id_producto": 1,
+                "cantidad": 1,
+                "precio_unitario": 100000,
+                "subtotal": 100000
+            }
+        ]
+    })
+    factura_id = response_creacion.json()["id"]
+    client.put(f"/factura/{factura_id}/pagar")
+
+    # Intentar cancelar
+    response = client.put(f"/factura/{factura_id}/cancelar")
+    assert response.status_code == 400
+    assert "No se puede cambiar el estado" in response.json()["detail"]
+
+@patch('src.factura.validator.FacturaValidator.validar_comanda_existe')
+def test_obtener_factura_por_id(mock_validar_comanda, client):
+    """
+    Test para verificar la obtención de una factura específica.
+    """
+    mock_validar_comanda.return_value = {"id": 1, "fecha": "2025-01-01"}
+
+    # Crear factura
+    response_creacion = client.post("/factura/", json={
+        "id_comanda": 1,
+        "total": 100000,
+        "medio_pago": "efectivo",
+        "detalles_factura": [
+            {
+                "id_producto": 1,
+                "cantidad": 1,
+                "precio_unitario": 100000,
+                "subtotal": 100000
+            }
+        ]
+    })
+    factura_id = response_creacion.json()["id"]
+
+    # Obtener factura
+    response = client.get(f"/factura/{factura_id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == factura_id
+    assert data["id_comanda"] == 1
+    assert len(data["detalles_factura"]) == 1
+
+def test_obtener_factura_inexistente(client):
+    """
+    Test para verificar el manejo de IDs inexistentes.
+    """
+    response = client.get("/factura/999")
+    assert response.status_code == 404
+
+@patch('src.factura.validator.FacturaValidator.validar_comanda_existe')
+def test_validacion_total_incorrecto(mock_validar_comanda, client):
+    """
+    Test para verificar que el total calculado coincida con el enviado.
+    """
+    mock_validar_comanda.return_value = {"id": 1, "fecha": "2025-01-01"}
+
+    factura_data = {
+        "id_comanda": 1,
+        "total": 300000,  # Total incorrecto
+        "medio_pago": "efectivo",
+        "detalles_factura": [
+            {
+                "id_producto": 1,
+                "cantidad": 1,
+                "precio_unitario": 200000,
+                "subtotal": 200000
+            },
+            {
+                "id_producto": 2,
+                "cantidad": 1,
+                "precio_unitario": 50000,
+                "subtotal": 50000
+            }
+        ]
+    }
+
+    # El total correcto sería 250000, no 300000
+    response = client.post("/factura/", json=factura_data)
+    assert response.status_code == 400
+    assert "no coincide con el total proporcionado" in response.json()["detail"]
