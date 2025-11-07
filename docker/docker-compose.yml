@@ -74,3 +74,14 @@ services:
     restart: always
     env_file:
       - ../backend/api-gestion-comanda/.env
+  gestion-facturacion:
+    build:
+      context: ../backend/api-gestion-facturacion
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8000"
+    volumes:
+      - ../backend/api-gestion-facturacion:/app
+    restart: always
+    env_file:
+      - ../backend/api-gestion-facturacion/.env
