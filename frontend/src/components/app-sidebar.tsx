@@ -83,8 +83,8 @@ const itemsFunciones = [
     icon: ClipboardList,
   },
   {
-    title: "Facturas",
-    url: "#",
+    title: "Facturación",
+    url: "facturacion",
     icon: Newspaper,
   },
 ]
