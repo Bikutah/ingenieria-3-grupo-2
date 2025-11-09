@@ -51,7 +51,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import { Plus, Pencil, Trash2, Check, ChevronsUpDown } from "lucide-react"
+import { Plus, Trash2, Check, ChevronsUpDown, BadgeDollarSign } from "lucide-react"
 
 import type { Comanda } from "@/services/comandas/types/Comanda"
 import type { ComandasListParams } from "@/services/comandas/types/Comanda"
@@ -77,10 +77,14 @@ import type { Producto } from "@/services/producto/types/Producto"
 import { toast } from "sonner"
 import { extractApiErrorMessage } from "@/lib/api-error"
 
+// Facturación
+import { facturacionService } from "@/services/facturacion/api/FacturacionService"
+import { MEDIOS_PAGO, type MedioPago } from "@/services/facturacion/types/Factura"
+
 const PAGE_SIZE = 50
 
 type ComandaExtended = Comanda & {
-  detalles_comanda?: DetalleComanda[] // Se usa detalles_comanda para consistencia con el backend y formData
+  detalles_comanda?: DetalleComanda[]
 }
 
 export default function ComandasPage() {
@@ -95,6 +99,9 @@ export default function ComandasPage() {
   const [comandaToDelete, setComandaToDelete] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // NUEVO: medio de pago para facturación
+  const [medioPago, setMedioPago] = useState<MedioPago | null>(null)
 
   const [formData, setFormData] = useState<Omit<ComandaExtended, "id">>({
     fecha: "",
@@ -142,10 +149,7 @@ export default function ComandasPage() {
 
     if (!data.id_mesa || data.id_mesa <= 0) errors.id_mesa = "Elegí una mesa"
     if (!data.id_mozo || data.id_mozo <= 0) errors.id_mozo = "Elegí un mozo"
-    
-    // id_reserva es opcional, puede ser 0
-    
-    // CORRECCIÓN: Usar detalles_comanda en la validación
+
     const tieneProductos = (data.detalles_comanda ?? []).some(d => (d.cantidad ?? 0) > 0)
     if (!tieneProductos) {
       errors.detalles = "Agregá al menos un producto con cantidad > 0"
@@ -252,8 +256,7 @@ export default function ComandasPage() {
     const t = setTimeout(() => {
       if (mozoOpen) loadMozos(mozoQuery)
     }, 300)
-    // CORRECCIÓN: Agregar la función de limpieza completa para evitar el error de sintaxis
-    return () => clearTimeout(t) 
+    return () => clearTimeout(t)
   }, [mozoQuery, mozoOpen, loadMozos])
 
   useEffect(() => {
@@ -266,7 +269,7 @@ export default function ComandasPage() {
   const [reservaOpen, setReservaOpen] = useState(false)
   const [reservaQuery, setReservaQuery] = useState("")
 
-  const reservaLabel = (r: Reserva) => 
+  const reservaLabel = (r: Reserva) =>
     `#${r.id} · ${r.fecha} ${r.horario} - Mesa ${r.id_mesa} (${r.cantidad_personas} pers.)`
 
   const loadReservas = useCallback(
@@ -303,8 +306,7 @@ export default function ComandasPage() {
   const [productosLoading, setProductosLoading] = useState(false)
   const [productoOpen, setProductoOpen] = useState(false)
   const [productoQuery, setProductoQuery] = useState("")
-  
-  // CORRECCIÓN: Usar detalles_comanda para los IDs seleccionados
+
   const selectedIds = new Set(
     formData.detalles_comanda?.map(d => d.id_producto) ?? []
   )
@@ -341,76 +343,30 @@ export default function ComandasPage() {
     if (productoOpen) loadProductos("")
   }, [productoOpen, loadProductos])
 
-  // Agregar producto al detalle
   const addOrIncProducto = (prodId: number, prodPrecio: number) => {
     setFormData(fd => {
-      // CORRECCIÓN: Usar detalles_comanda
       const detalles_comanda = [...(fd.detalles_comanda ?? [])]
       const idx = detalles_comanda.findIndex(d => d.id_producto === prodId)
       if (idx >= 0) {
         detalles_comanda[idx] = { ...detalles_comanda[idx], cantidad: (detalles_comanda[idx].cantidad ?? 0) + 1 }
       } else {
-        detalles_comanda.push({ 
-          id: 0, // temporal, el backend asigna el id
-          id_producto: prodId, 
-          cantidad: 1, 
-          precio_unitario: prodPrecio 
+        detalles_comanda.push({
+          id: 0,
+          id_producto: prodId,
+          cantidad: 1,
+          precio_unitario: prodPrecio
         })
       }
-      // CORRECCIÓN: Devolver detalles_comanda
       return { ...fd, detalles_comanda }
     })
   }
-  useEffect(() => {
-    if (isDialogOpen && selectedComanda) {
-      // Si la lista de mesas está vacía o el ID de la mesa no está cargado
-      if (mesas.length === 0 || !mesas.find(m => m.id === formData.id_mesa)) {
-        loadMesas();
-      }
-      // Si la lista de mozos está vacía o el ID del mozo no está cargado
-      if (mozos.length === 0 || !mozos.find(m => m.id === formData.id_mozo)) {
-        loadMozos();
-      }
-      // Si la lista de reservas está vacía o el ID de la reserva no está cargado (solo si es > 0)
-      if (formData.id_reserva > 0 && (reservas.length === 0 || !reservas.find(r => r.id === formData.id_reserva))) {
-        loadReservas();
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDialogOpen, selectedComanda, formData.id_mesa, formData.id_mozo, formData.id_reserva, loadMesas, loadMozos, loadReservas]);
-  // Cargar lista inicial
-  useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      setLoading(true)
-      try {
-        const data = await comandasService.list({ page: 1, size: PAGE_SIZE, ...filters })
-        if (!mounted) return
-        setComandas(data.items)
-        setTotal(data.total ?? 0)
-        setPage(data.page ?? 1)
-        setPages(data.pages)
-        setSize(data.size ?? PAGE_SIZE)
-        
-        // 🛑 AÑADIR: Cargar las dependencias necesarias para mostrar los nombres/tipos
-        await loadMozos()
-        await loadMesas()
 
-      } catch (e) {
-        console.error("Error cargando comandas:", e)
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    })()
-    return () => { mounted = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // CORRECCIÓN: Implementación de la carga asíncrona de detalles para edición
+  // Abrir diálogo (nueva o facturar existente)
   const handleOpenDialog = async (comanda?: Comanda) => {
     setTouched({})
     setIsDialogOpen(true)
     setSelectedComanda(null)
+    setMedioPago(null) // reset medio de pago
 
     // Estado inicial limpio
     setFormData({
@@ -424,25 +380,21 @@ export default function ComandasPage() {
 
     if (comanda) {
       setSelectedComanda(comanda)
-      setLoading(true) // Usamos loading para bloquear la interfaz mientras se carga
+      setLoading(true)
       try {
-        // Obtener la comanda con sus detalles
         const fullComanda = await comandasService.getById(comanda.id)
-
-        // Setear el estado del formulario con los datos completos
         setFormData({
           fecha: fullComanda.fecha,
           id_mesa: fullComanda.id_mesa,
           id_mozo: fullComanda.id_mozo,
           id_reserva: fullComanda.id_reserva,
           baja: fullComanda.baja,
-          // Precargar los detalles de la comanda
           detalles_comanda: fullComanda.detalles_comanda ?? [],
         })
       } catch (e) {
         console.error("Error cargando detalles de comanda:", e)
         toast.error("No se pudieron cargar los detalles para edición.", { description: extractApiErrorMessage(e) })
-        setIsDialogOpen(false) // Cerrar si falla la carga
+        setIsDialogOpen(false)
       } finally {
         setLoading(false)
       }
@@ -462,40 +414,51 @@ export default function ComandasPage() {
       return
     }
 
+    // Al facturar una comanda existente, el medio de pago es obligatorio
+    if (selectedComanda && !medioPago) {
+      toast.error("Elegí un medio de pago para facturar")
+      return
+    }
+
     const payload = {
-    fecha: formData.fecha,
-    id_mesa: formData.id_mesa,
-    id_mozo: formData.id_mozo,
-    id_reserva: formData.id_reserva || 0,
-    baja: formData.baja,
-    // Usar detalles_comanda en el payload
-    detalles_comanda: formData.detalles_comanda?.map(d => ({
+      fecha: formData.fecha,
+      id_mesa: formData.id_mesa,
+      id_mozo: formData.id_mozo,
+      id_reserva: formData.id_reserva || 0,
+      baja: formData.baja,
+      detalles_comanda: formData.detalles_comanda?.map(d => ({
         id: d.id,
         id_producto: d.id_producto,
         cantidad: d.cantidad,
         precio_unitario: d.precio_unitario,
-    })) ?? []
+      })) ?? []
     }
 
     try {
-    setSaving(true)
-    if (selectedComanda) {
+      setSaving(true)
+      if (selectedComanda) {
         const updated = await comandasService.update(selectedComanda.id, payload)
+
+        // Crear la factura con el medio de pago elegido
+        await facturacionService.create({
+          id_comanda: updated.id,
+          medio_pago: medioPago!, // validado arriba
+        })
+
         setComandas(prev => prev.map(c => (c.id === selectedComanda.id ? updated : c)))
-        toast.success("Comanda actualizada", { description: `#${updated?.id ?? selectedComanda.id}` })
-    } else {
+        toast.success("Comanda facturada", { description: `#${updated?.id ?? selectedComanda.id}` })
+      } else {
         const created = await comandasService.create(payload)
         await loadPage(1, size)
         toast.success("Comanda creada", { description: `#${created?.id ?? "?"}` })
-    }
-    setIsDialogOpen(false)
+      }
+      setIsDialogOpen(false)
     } catch (e) {
-    toast.error("No se pudo guardar", { description: extractApiErrorMessage(e) })
-    console.error(e)
+      toast.error("No se pudo guardar", { description: extractApiErrorMessage(e) })
+      console.error(e)
     } finally {
-    setSaving(false)
+      setSaving(false)
     }
-
   }
 
   const handleDelete = async () => {
@@ -517,6 +480,31 @@ export default function ComandasPage() {
     setIsDeleteDialogOpen(true)
   }
 
+  // Cargar lista inicial + dependencias mínimas
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      setLoading(true)
+      try {
+        const data = await comandasService.list({ page: 1, size: PAGE_SIZE, ...filters })
+        if (!mounted) return
+        setComandas(data.items)
+        setTotal(data.total ?? 0)
+        setPage(data.page ?? 1)
+        setPages(data.pages)
+        setSize(data.size ?? PAGE_SIZE)
+        await loadMozos()
+        await loadMesas()
+      } catch (e) {
+        console.error("Error cargando comandas:", e)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    })()
+    return () => { mounted = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -526,7 +514,13 @@ export default function ComandasPage() {
             {loading ? "Cargando..." : "Administra las comandas de tu restaurante"}
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={(open) => {
+            setIsDialogOpen(open)
+            if (!open) setMedioPago(null) // reset al cerrar
+          }}
+        >
           <DialogTrigger asChild>
             <Button onClick={() => handleOpenDialog()}>
               <Plus className="mr-2 h-4 w-4" />
@@ -535,9 +529,9 @@ export default function ComandasPage() {
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{selectedComanda ? "Modificar Comanda" : "Nueva Comanda"}</DialogTitle>
+              <DialogTitle>{selectedComanda ? "Facturar Comanda" : "Nueva Comanda"}</DialogTitle>
               <DialogDescription>
-                {selectedComanda ? "Modifica los datos de la comanda" : "Completa los datos de la nueva comanda"}
+                {selectedComanda ? "Modifica los datos de la comanda si es necesario y elegí el método de pago" : "Completa los datos de la nueva comanda"}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -769,7 +763,7 @@ export default function ComandasPage() {
                       <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                     <Command>
                       <CommandInput
                         placeholder="Buscar por nombre, tipo…"
@@ -806,7 +800,6 @@ export default function ComandasPage() {
                 </Popover>
 
                 {/* Lista de productos seleccionados */}
-                {/* CORRECCIÓN: Usar detalles_comanda aquí */}
                 {formData.detalles_comanda?.length ? (
                   <div className="rounded-md border">
                     <Table>
@@ -833,11 +826,9 @@ export default function ComandasPage() {
                                   onChange={(e) => {
                                     const qty = Math.max(0, Number(e.target.value || 0))
                                     setFormData(fd => {
-                                      // CORRECCIÓN: Usar detalles_comanda
                                       const copy = (fd.detalles_comanda ?? []).map(x =>
                                         x.id_producto === d.id_producto ? { ...x, cantidad: qty } : x
                                       )
-                                      // CORRECCIÓN: Devolver detalles_comanda
                                       return { ...fd, detalles_comanda: copy }
                                     })
                                   }}
@@ -850,7 +841,6 @@ export default function ComandasPage() {
                                   onClick={() => {
                                     setFormData(fd => ({
                                       ...fd,
-                                      // CORRECCIÓN: Usar detalles_comanda
                                       detalles_comanda: (fd.detalles_comanda ?? []).filter(x => x.id_producto !== d.id_producto)
                                     }))
                                   }}
@@ -871,14 +861,47 @@ export default function ComandasPage() {
                   <p className="text-sm text-red-600">{formErrors.detalles}</p>
                 )}
               </div>
+
+              {/* NUEVO: Método de pago (solo cuando se factura una comanda existente) */}
+              {selectedComanda && (
+                <div className="grid gap-1.5">
+                  <Label htmlFor="medio_pago">Método de pago</Label>
+                  <Select
+                    value={medioPago ?? undefined}
+                    onValueChange={(v) => setMedioPago(v as MedioPago)}
+                  >
+                    <SelectTrigger id="medio_pago" className="w-full">
+                      <SelectValue placeholder="Seleccioná un medio de pago" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Medios disponibles</SelectLabel>
+                        {MEDIOS_PAGO.map(mp => (
+                          <SelectItem key={mp} value={mp}>
+                            {mp}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {!medioPago && (
+                    <p className="text-sm text-muted-foreground">
+                      Elegí un medio de pago para emitir la factura.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
                 Cancelar
               </Button>
-              <Button onClick={handleSave} disabled={saving || !isFormValid}>
-                {selectedComanda ? "Guardar Cambios" : "Crear Comanda"}
+              <Button
+                onClick={handleSave}
+                disabled={saving || !isFormValid || (selectedComanda && !medioPago)}
+              >
+                {selectedComanda ? "Generar facturación" : "Crear Comanda"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -919,10 +942,7 @@ export default function ComandasPage() {
 
         {/* Acciones */}
         <div className="flex gap-2">
-          <Button
-            onClick={() => loadPage(1, size)}
-            disabled={loading}
-          >
+          <Button onClick={() => loadPage(1, size)} disabled={loading}>
             Aplicar filtros
           </Button>
           <Button
@@ -954,11 +974,9 @@ export default function ComandasPage() {
           </TableHeader>
           <TableBody>
             {comandas.map((comanda) => {
-              // Búsqueda del mozo y la mesa por ID
               const mozo = mozos.find(m => m.id === comanda.id_mozo);
               const mesa = mesas.find(m => m.id === comanda.id_mesa);
-              
-              // Determinar la etiqueta a mostrar
+
               const mozoDisplay = mozo ? `${mozo.nombre} ${mozo.apellido}` : `#${comanda.id_mozo}`;
               const mesaDisplay = mesa ? `${mesa.tipo} (${mesa.numero})` : `#${comanda.id_mesa}`;
 
@@ -966,13 +984,8 @@ export default function ComandasPage() {
                 <TableRow key={comanda.id}>
                   <TableCell className="font-medium">{comanda.id}</TableCell>
                   <TableCell>{comanda.fecha}</TableCell>
-                  
-                  {/* 🛑 MOSTRAR TIPO Y NÚMERO DE MESA */}
                   <TableCell>{mesaDisplay}</TableCell>
-                  
-                  {/* 🛑 MOSTRAR NOMBRE Y APELLIDO DEL MOZO */}
                   <TableCell>{mozoDisplay}</TableCell>
-                  
                   <TableCell>{comanda.id_reserva || "-"}</TableCell>
                   <TableCell>
                     <span
@@ -987,8 +1000,8 @@ export default function ComandasPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(comanda)}>
-                        <Pencil className="h-4 w-4" />
+                      <Button size="sm" className="capitalize" onClick={() => handleOpenDialog(comanda)}>
+                        <BadgeDollarSign className="mr-1 h-4 w-4" /> Facturar
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(comanda.id)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -1011,7 +1024,6 @@ export default function ComandasPage() {
 
       {/* Paginación */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        {/* Rango visible */}
         <div className="text-sm text-muted-foreground">
           {(() => {
             const start = total === 0 ? 0 : (page - 1) * size + 1
@@ -1020,7 +1032,6 @@ export default function ComandasPage() {
           })()}
         </div>
 
-        {/* Selector de filas por página */}
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Filas por página</span>
           <Select
@@ -1047,7 +1058,6 @@ export default function ComandasPage() {
           </Select>
         </div>
 
-        {/* Botonera de paginación */}
         {(() => {
           const totalPages =
             pages ?? Math.max(1, Math.ceil((total ?? 0) / (size || 1)))

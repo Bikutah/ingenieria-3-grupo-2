@@ -1,7 +1,7 @@
 import { type DetalleComanda } from "@/services/comandas/types/DetalleComanda";
 
 export type Comanda = {
-  id?: number
+  id: number
   id_mesa: number
   id_mozo: number
   id_reserva?: number | null

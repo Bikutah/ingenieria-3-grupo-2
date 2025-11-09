@@ -11,11 +11,12 @@ export type Factura = {
   total: number;          
   medio_pago: MedioPago;
   estado: EstadoFactura;
-  /**
-   * TODO: cuando el back deje de esperarlo “vacío”, tipar bien este campo.
-   * De momento lo dejamos opcional para no romper create/update.
-   */
   detalles_factura?: string | null;
 };
 
 export type NuevaFactura = Omit<Factura, 'id'>;
+
+export type CreateFactura = {
+  id_comanda: number;
+  medio_pago: MedioPago;
+};

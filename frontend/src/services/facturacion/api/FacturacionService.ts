@@ -1,7 +1,7 @@
 // infrastructure/repositories/facturacionServiceHttp.ts
 import { request } from "@/config/http/httpClient";
 // Respeta el case real del archivo:
-import { type Factura, type NuevaFactura, type MedioPago, type EstadoFactura } from "@/services/facturacion/types/Factura";
+import { type Factura, type NuevaFactura, type MedioPago, type EstadoFactura, type CreateFactura } from "@/services/facturacion/types/Factura";
 
 const DEFAULT_BASE = "/gestion-facturacion";
 const ENTIDAD = "/factura/";
@@ -77,7 +77,7 @@ export const facturacionService = {
     return res.data;
   },
 
-  async create(data: NuevaFactura) {
+  async create(data: CreateFactura) {
     const res = await request<Factura>({ method: "POST", url: ENTIDAD, data, baseURL: DEFAULT_BASE });
     return res.data;
   },
