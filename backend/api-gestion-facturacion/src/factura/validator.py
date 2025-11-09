@@ -104,4 +104,9 @@ class FacturaValidator:
 
     def calcular_total_desde_comanda(self, detalles_comanda: list) -> float:
         """Calcula el total de la factura desde los detalles de la comanda"""
+        if not detalles_comanda:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se puede crear factura para una comanda sin detalles"
+            )
         return sum(detalle["cantidad"] * detalle["precio_unitario"] for detalle in detalles_comanda)
