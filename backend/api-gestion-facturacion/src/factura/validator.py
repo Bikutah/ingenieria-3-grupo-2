@@ -8,23 +8,40 @@ class FacturaValidator:
         self.db = db
         self.comanda_api_url = "http://gestion-comanda:8000"  
 
-    async def validar_comanda_existe(self, id_comanda: int) -> dict:
-        """Valida que la comanda existe llamando a la API de gestión-comanda"""
+    async def obtener_datos_comanda(self, id_comanda: int) -> dict:
+        """Obtiene los datos completos de la comanda desde la API de gestión-comanda"""
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get(f"{self.comanda_api_url}/comanda/{id_comanda}")
-                if response.status_code == 200:
-                    return response.json()
-                elif response.status_code == 404:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Comanda con ID {id_comanda} no existe"
-                    )
-                else:
+                # Obtener datos de la comanda
+                response_comanda = await client.get(f"{self.comanda_api_url}/comanda/{id_comanda}")
+                if response_comanda.status_code != 200:
+                    if response_comanda.status_code == 404:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Comanda con ID {id_comanda} no existe"
+                        )
+                    else:
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Error al obtener datos de comanda"
+                        )
+
+                # Obtener detalles de la comanda
+                response_detalles = await client.get(f"{self.comanda_api_url}/comanda/{id_comanda}/detalles")
+                if response_detalles.status_code != 200:
                     raise HTTPException(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="Error al validar comanda con el servicio de gestión-comanda"
+                        detail="Error al obtener detalles de comanda"
                     )
+
+                comanda_data = response_comanda.json()
+                detalles_data = response_detalles.json()
+
+                return {
+                    "comanda": comanda_data,
+                    "detalles": detalles_data["items"]  # Extraer items de la paginación
+                }
+
         except httpx.RequestError:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -65,18 +82,26 @@ class FacturaValidator:
 
     async def validar_creacion_factura(self, payload: schemas.FacturaCreate):
         """Valida todos los requisitos para crear una factura"""
-        # Validar que la comanda existe
-        comanda_data = await self.validar_comanda_existe(payload.id_comanda)
+        # Validar que la comanda existe y obtener sus datos
+        datos_comanda = await self.obtener_datos_comanda(payload.id_comanda)
 
         # Validar que no existe factura para esta comanda
         self.validar_no_factura_existente(payload.id_comanda)
 
-        # Validar que los totales coincidan (si vienen calculados)
-        total_calculado = self.calcular_totales(payload.detalles_factura)
-        if abs(payload.total - total_calculado) > 0.01:  # Tolerancia para errores de redondeo
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"El total calculado ({total_calculado}) no coincide con el total proporcionado ({payload.total})"
-            )
+        return datos_comanda  # Retornar datos completos de la comanda
 
-        return comanda_data  # Retornar datos de la comanda para uso posterior
+    def crear_detalles_factura_desde_comanda(self, detalles_comanda: list) -> list[schemas.DetalleFacturaCreate]:
+        """Convierte los detalles de comanda en detalles de factura"""
+        detalles_factura = []
+        for detalle in detalles_comanda:
+            detalles_factura.append(schemas.DetalleFacturaCreate(
+                id_producto=detalle["id_producto"],
+                cantidad=detalle["cantidad"],
+                precio_unitario=detalle["precio_unitario"],
+                subtotal=detalle["cantidad"] * detalle["precio_unitario"]
+            ))
+        return detalles_factura
+
+    def calcular_total_desde_comanda(self, detalles_comanda: list) -> float:
+        """Calcula el total de la factura desde los detalles de la comanda"""
+        return sum(detalle["cantidad"] * detalle["precio_unitario"] for detalle in detalles_comanda)

@@ -17,19 +17,25 @@ router = APIRouter()
 async def create(payload: schemas.FacturaCreate, db: Session = Depends(get_db)):
     validator = FacturaValidator(db)
 
-    # Validar creación de factura
-    await validator.validar_creacion_factura(payload)
+    # Validar y obtener datos de la comanda
+    datos_comanda = await validator.validar_creacion_factura(payload)
+
+    # Crear detalles de factura desde los detalles de la comanda
+    detalles_factura = validator.crear_detalles_factura_desde_comanda(datos_comanda["detalles"])
+
+    # Calcular total desde los detalles
+    total = validator.calcular_total_desde_comanda(datos_comanda["detalles"])
 
     db_factura = models.Factura(
         id_comanda=payload.id_comanda,
-        total=payload.total,
+        total=total,
         medio_pago=payload.medio_pago,
-        estado=payload.estado
+        estado=models.EstadoFactura.pendiente
     )
     db.add(db_factura)
     db.flush()
 
-    for detalle in payload.detalles_factura:
+    for detalle in detalles_factura:
         db_detalle = models.DetalleFactura(
             id_factura=db_factura.id,
             id_producto=detalle.id_producto,

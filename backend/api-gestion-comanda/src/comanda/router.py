@@ -87,8 +87,6 @@ def delete(id_: int, db: Session = Depends(get_db)):
 @router.get("/{id_comanda}/detalles", response_model=Page[schemas.DetalleComandaOut])
 def get_detalles(id_comanda: int, db: Session = Depends(get_db)):
     query = select(models.DetalleComanda).where(models.DetalleComanda.id_comanda == id_comanda)
-    if query is None:
-        raise HTTPException(status_code=404, detail="Detalles de comanda no encontrados")
     return paginate(db, query)
 
 #Modificacion Detalles de Comanda

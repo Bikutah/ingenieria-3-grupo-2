@@ -38,10 +38,10 @@ class FacturaBase(BaseModel):
     medio_pago: MedioPago
     estado: EstadoFactura = EstadoFactura.pendiente
 
-class FacturaCreate(FacturaBase):
-    """Para crear factura - estado siempre pendiente inicialmente"""
-    estado: Literal["pendiente"] = "pendiente"  
-    detalles_factura: List[DetalleFacturaCreate] = Field(..., min_length=1)
+class FacturaCreate(BaseModel):
+    """Para crear factura desde id_comanda - el resto se obtiene automáticamente"""
+    id_comanda: int = Field(..., gt=0)
+    medio_pago: MedioPago
 
 class FacturaOut(FacturaBase):
     id: int
