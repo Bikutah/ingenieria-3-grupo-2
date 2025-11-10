@@ -8,7 +8,7 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col items-center min-h-screen p-2 gap-8">
-      <h1 className="text-4xl font-bold tracking-tight text-foreground">Boru, gestiona tus bondiolas</h1>
+      <h1 className="text-4xl font-bold tracking-tight text-foreground">Ború, gestiona tus bondiolas</h1>
 
       <Carousel
         opts={{
