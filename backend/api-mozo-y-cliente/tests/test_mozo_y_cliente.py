@@ -98,8 +98,9 @@ def test_crear_mozo_con_dni_duplicado(client):
         "telefono": "987654321"
     })
 
-    # SQLite lanza IntegrityError directamente, no pasa por el manejo de excepciones del código
-    assert response.status_code == 500  # Error interno por IntegrityError
+    # Ahora con validación previa, debe devolver 409 Conflict
+    assert response.status_code == 409
+    assert "DNI ya registrado" in response.json()["detail"]
 
 def test_crear_mozo_con_dni_invalido(client):
     """
@@ -330,8 +331,9 @@ def test_crear_cliente_con_dni_duplicado(client):
         "telefono": "444444444"
     })
 
-    # SQLite lanza IntegrityError directamente, no pasa por el manejo de excepciones del código
-    assert response.status_code == 500  # Error interno por IntegrityError
+    # Ahora con validación previa, debe devolver 409 Conflict
+    assert response.status_code == 409
+    assert "DNI ya registrado" in response.json()["detail"]
 
 def test_crear_cliente_con_dni_invalido(client):
     """

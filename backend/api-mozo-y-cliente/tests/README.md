@@ -107,9 +107,3 @@ Los tests cubren:
 - ✅ Paginación de resultados
 - ✅ Manejo de errores (IDs inexistentes, datos inválidos)
 - ✅ Normalización de strings (trim automático)
-
-## ⚠️ Notas sobre Tests que Fallan
-
-Dos tests (`test_crear_mozo_con_dni_duplicado` y `test_crear_cliente_con_dni_duplicado`) fallan en SQLite con `status 500` en lugar del esperado `409`. Esto ocurre porque SQLite lanza `IntegrityError` directamente desde la BD antes de que el código pueda manejarlo.
-
-En producción con PostgreSQL/MySQL, estos errores serían manejados correctamente por el código y devolverían `409 Conflict`.

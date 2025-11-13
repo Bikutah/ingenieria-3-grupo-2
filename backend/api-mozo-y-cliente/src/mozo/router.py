@@ -15,6 +15,11 @@ router = APIRouter()
 
 @router.post("/", response_model=schemas.MozoOut)
 def create(payload: schemas.MozoCreate, db: Session = Depends(get_db)):
+    # Validar unicidad de DNI antes del commit
+    existente = db.query(models.Mozo).filter(models.Mozo.dni == payload.dni).first()
+    if existente:
+        raise HTTPException(status_code=409, detail="DNI ya registrado")
+
     db_obj = models.Mozo(nombre=payload.nombre, apellido=payload.apellido, dni=payload.dni, direccion=payload.direccion, telefono=payload.telefono)
     db.add(db_obj)
     db.commit()
