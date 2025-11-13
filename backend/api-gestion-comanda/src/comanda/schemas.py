@@ -19,7 +19,7 @@ class DetalleComandaOut(DetalleComandaBase):
 class ComandaBase(BaseModel):
     id_mesa: int = Field(..., gt=0)
     id_mozo: int = Field(..., gt=0)
-    id_reserva: int | None = Field(None, gt=0)
+    id_reserva: int | None = None
     fecha: date
     baja: bool = False
 
