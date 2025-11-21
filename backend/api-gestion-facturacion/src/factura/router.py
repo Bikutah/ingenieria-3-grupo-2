@@ -23,12 +23,17 @@ async def create(payload: schemas.FacturaCreate, db: Session = Depends(get_db)):
     # Crear detalles de factura desde los detalles de la comanda
     detalles_factura = validator.crear_detalles_factura_desde_comanda(datos_comanda["detalles"])
 
-    # Calcular total desde los detalles
-    total = validator.calcular_total_desde_comanda(datos_comanda["detalles"])
+    # Calcular total con descuento por seña si aplica
+    id_reserva = datos_comanda["comanda"].get("id_reserva")
+    total = await validator.calcular_total_con_descuento_seña(datos_comanda["detalles"], id_reserva)
+
+    # Obtener monto de seña aplicado como descuento
+    monto_seña = await validator.obtener_descuento_seña(id_reserva) if id_reserva else 0.0
 
     db_factura = models.Factura(
         id_comanda=payload.id_comanda,
         total=total,
+        monto_seña=monto_seña,  # Guardar el monto de seña aplicado
         medio_pago=payload.medio_pago,
         estado=models.EstadoFactura.pendiente
     )

@@ -19,9 +19,10 @@ class Factura(Base):
     __tablename__ = "facturas"  
 
     id = Column(Integer, primary_key=True, index=True)
-    id_comanda = Column(Integer, index=True, nullable=False)  
+    id_comanda = Column(Integer, index=True, nullable=False)
     fecha_emision = Column(DateTime, server_default=func.now(), index=True, nullable=False)
     total = Column(Float, nullable=False)
+    monto_seña = Column(Float, default=0.0, nullable=False)  # Monto de seña aplicado como descuento
     medio_pago = Column(Enum(MedioPago), nullable=False)
     estado = Column(Enum(EstadoFactura), default=EstadoFactura.pendiente, nullable=False)
     created_at = Column(DateTime, server_default=func.now(), index=True)

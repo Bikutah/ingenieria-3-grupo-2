@@ -6,7 +6,8 @@ from . import models, schemas
 class FacturaValidator:
     def __init__(self, db: Session):
         self.db = db
-        self.comanda_api_url = "http://gestion-comanda:8000"  
+        self.comanda_api_url = "http://gestion-comanda:8000"
+        self.reserva_api_url = "http://gestion-reservas:8000"
 
     async def obtener_datos_comanda(self, id_comanda: int) -> dict:
         """Obtiene los datos completos de la comanda desde la API de gestión-comanda"""
@@ -46,6 +47,41 @@ class FacturaValidator:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="No se pudo conectar al servicio de gestión-comanda"
+            )
+
+    async def validar_seña_reserva_pagada(self, id_reserva: int):
+        """Valida que si la comanda tiene reserva, la seña esté pagada"""
+        if not id_reserva:
+            return  # No hay reserva, validación pasa
+
+        try:
+            async with httpx.AsyncClient() as client:
+                # Obtener datos de la reserva
+                response = await client.get(f"{self.reserva_api_url}/reserva/{id_reserva}")
+                if response.status_code == 404:
+                    # Reserva no existe, pero no es error crítico para facturación
+                    return
+                elif response.status_code != 200:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Error al consultar reserva"
+                    )
+
+                reserva_data = response.json()
+
+                # Verificar si tiene menú reserva con seña pagada
+                menu_reserva = reserva_data.get("menu_reserva")
+                if menu_reserva and menu_reserva.get("monto_seña"):
+                    if not menu_reserva.get("seña_pagada", False):
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"La reserva {id_reserva} tiene una seña pendiente de pago. No se puede facturar hasta que la seña sea pagada."
+                        )
+
+        except httpx.RequestError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No se pudo conectar al servicio de gestión-reservas"
             )
 
     def validar_no_factura_existente(self, id_comanda: int):
@@ -102,11 +138,44 @@ class FacturaValidator:
             ))
         return detalles_factura
 
-    def calcular_total_desde_comanda(self, detalles_comanda: list) -> float:
-        """Calcula el total de la factura desde los detalles de la comanda"""
+    async def calcular_total_con_descuento_seña(self, detalles_comanda: list, id_reserva: int = None) -> float:
+        """Calcula el total de la factura aplicando descuento por seña pagada si corresponde"""
         if not detalles_comanda:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No se puede crear factura para una comanda sin detalles"
             )
-        return sum(detalle["cantidad"] * detalle["precio_unitario"] for detalle in detalles_comanda)
+
+        # Calcular total base de la comanda
+        total_base = sum(detalle["cantidad"] * detalle["precio_unitario"] for detalle in detalles_comanda)
+
+        # Si hay reserva, verificar si aplica descuento por seña
+        if id_reserva:
+            try:
+                descuento_seña = await self.obtener_descuento_seña(id_reserva)
+                total_base -= descuento_seña
+            except Exception:
+                # Si hay error obteniendo info de seña, continuar sin descuento
+                pass
+
+        return max(0, total_base)  # Asegurar que no sea negativo
+
+    async def obtener_descuento_seña(self, id_reserva: int) -> float:
+        """Obtiene el monto de descuento por seña pagada (monto_seña > 0)"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(f"{self.reserva_api_url}/reserva/{id_reserva}")
+                if response.status_code == 200:
+                    reserva_data = response.json()
+                    menu_reserva = reserva_data.get("menu_reserva")
+
+                    # Si tiene menú reserva con monto_seña > 0, devolver el monto como descuento
+                    if menu_reserva and menu_reserva.get("monto_seña") and menu_reserva["monto_seña"] > 0:
+                        return float(menu_reserva["monto_seña"])
+
+                # Si no hay seña pagada (monto_seña <= 0) o hay error, no aplicar descuento
+                return 0.0
+
+        except Exception:
+            # En caso de error de conexión o cualquier otro, no aplicar descuento
+            return 0.0

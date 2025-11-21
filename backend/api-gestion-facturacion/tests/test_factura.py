@@ -57,7 +57,8 @@ def client():
 # --- Tests para el endpoint de Facturas ---
 
 @patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
-def test_crear_factura_exitoso(mock_obtener_datos, client):
+@patch('src.factura.validator.FacturaValidator.calcular_total_con_descuento_seña')
+def test_crear_factura_exitoso(mock_calcular_total, mock_obtener_datos, client):
     """
     Test para verificar la creación exitosa de una factura desde id_comanda.
     """
@@ -81,6 +82,7 @@ def test_crear_factura_exitoso(mock_obtener_datos, client):
             }
         ]
     }
+    mock_calcular_total.return_value = 400000  # Total calculado
 
     # Datos de factura: solo id_comanda y medio_pago
     factura_data = {
@@ -94,6 +96,7 @@ def test_crear_factura_exitoso(mock_obtener_datos, client):
     data = response.json()
     assert data["id_comanda"] == 1
     assert data["total"] == 400000  # 2*150000 + 1*100000
+    assert data["monto_seña"] == 0.0  # Sin reserva, sin seña
     assert data["medio_pago"] == "transferencia"
     assert data["estado"] == "pendiente"
     assert "id" in data
@@ -346,6 +349,82 @@ def test_obtener_factura_inexistente(client):
     """
     response = client.get("/factura/999")
     assert response.status_code == 404
+
+@patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
+@patch('src.factura.validator.FacturaValidator.calcular_total_con_descuento_seña')
+def test_crear_factura_sin_reserva(mock_calcular_total, mock_obtener_datos, client):
+    """
+    Test para verificar que factura sin reserva cobra el total completo.
+    """
+    # Configurar mocks
+    mock_obtener_datos.return_value = {
+        "comanda": {"id": 1, "fecha": "2025-01-01"},  # Sin id_reserva
+        "detalles": [{"id": 1, "id_comanda": 1, "id_producto": 1, "cantidad": 1, "precio_unitario": 100000}]
+    }
+    mock_calcular_total.return_value = 100000  # Total completo
+
+    factura_data = {
+        "id_comanda": 1,
+        "medio_pago": "efectivo"
+    }
+
+    response = client.post("/factura/", json=factura_data)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["id_comanda"] == 1
+    assert data["total"] == 100000  # Cobra el total completo
+    assert data["monto_seña"] == 0.0  # Reserva sin seña
+
+@patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
+@patch('src.factura.validator.FacturaValidator.calcular_total_con_descuento_seña')
+def test_crear_factura_con_reserva_sin_seña(mock_calcular_total, mock_obtener_datos, client):
+    """
+    Test para verificar que reserva con monto_seña = 0 cobra el total completo.
+    """
+    # Configurar mocks
+    mock_obtener_datos.return_value = {
+        "comanda": {"id": 1, "id_reserva": 123, "fecha": "2025-01-01"},
+        "detalles": [{"id": 1, "id_comanda": 1, "id_producto": 1, "cantidad": 1, "precio_unitario": 100000}]
+    }
+    mock_calcular_total.return_value = 100000  # Total completo (sin descuento)
+
+    factura_data = {
+        "id_comanda": 1,
+        "medio_pago": "efectivo"
+    }
+
+    response = client.post("/factura/", json=factura_data)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["id_comanda"] == 1
+    assert data["total"] == 100000  # Cobra el total completo
+
+@patch('src.factura.validator.FacturaValidator.obtener_descuento_seña')
+@patch('src.factura.validator.FacturaValidator.calcular_total_con_descuento_seña')
+@patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
+def test_crear_factura_con_reserva_con_seña(mock_obtener_datos, mock_calcular_total, mock_obtener_descuento, client):
+    """
+    Test para verificar que se aplica descuento automático si monto_seña > 0.
+    """
+    # Configurar mocks
+    mock_obtener_datos.return_value = {
+        "comanda": {"id": 1, "id_reserva": 123, "fecha": "2025-01-01"},
+        "detalles": [{"id": 1, "id_comanda": 1, "id_producto": 1, "cantidad": 1, "precio_unitario": 100000}]
+    }
+    mock_calcular_total.return_value = 50000  # Total con descuento de seña de 50000
+    mock_obtener_descuento.return_value = 50000  # Monto de seña aplicado
+
+    factura_data = {
+        "id_comanda": 1,
+        "medio_pago": "efectivo"
+    }
+
+    response = client.post("/factura/", json=factura_data)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["id_comanda"] == 1
+    assert data["total"] == 50000  # Aplica descuento por seña
+    assert data["monto_seña"] == 50000  # Guarda el monto de seña aplicado
 
 # Este test ya no aplica porque ahora el total se calcula automáticamente
 # def test_validacion_total_incorrecto(client):

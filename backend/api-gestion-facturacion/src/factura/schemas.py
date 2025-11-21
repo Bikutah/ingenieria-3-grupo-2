@@ -35,6 +35,7 @@ class DetalleFacturaOut(DetalleFacturaBase):
 class FacturaBase(BaseModel):
     id_comanda: int = Field(..., gt=0)
     total: float = Field(..., gt=0)
+    monto_seña: float = Field(default=0.0, ge=0)  # Monto de seña aplicado como descuento
     medio_pago: MedioPago
     estado: EstadoFactura = EstadoFactura.pendiente
 
@@ -60,6 +61,7 @@ class FacturaList(BaseModel):
     id_comanda: int
     fecha_emision: datetime
     total: float
+    monto_seña: float
     medio_pago: MedioPago
     estado: EstadoFactura
     model_config = ConfigDict(from_attributes=True)
