@@ -79,12 +79,12 @@ const itemsFunciones = [
   },
   {
     title: "Comandas",
-    url: "#",
+    url: "comandas",
     icon: ClipboardList,
   },
   {
-    title: "Facturas",
-    url: "#",
+    title: "Facturación",
+    url: "facturacion",
     icon: Newspaper,
   },
 ]
@@ -131,7 +131,7 @@ export function AppSidebar() {
                       />
                     </div>
                     <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">Boru</span>
+                      <span className="truncate font-semibold">Ború</span>
                       <span className="truncate text-xs text-sidebar-foreground/70">
                         El peor restaurante
                       </span>

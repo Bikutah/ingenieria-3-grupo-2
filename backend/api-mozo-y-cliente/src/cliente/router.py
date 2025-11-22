@@ -15,6 +15,11 @@ router = APIRouter()
 
 @router.post("/", response_model=schemas.ClienteOut)
 def create(payload: schemas.ClienteCreate, db: Session = Depends(get_db)):
+    # Validar unicidad de DNI antes del commit
+    existente = db.query(models.Cliente).filter(models.Cliente.dni == payload.dni).first()
+    if existente:
+        raise HTTPException(status_code=409, detail="DNI ya registrado")
+
     db_obj = models.Cliente(nombre=payload.nombre, apellido=payload.apellido, dni=payload.dni, telefono=payload.telefono)
     db.add(db_obj)
     db.commit()
