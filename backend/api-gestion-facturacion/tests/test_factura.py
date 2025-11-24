@@ -56,9 +56,10 @@ def client():
 
 # --- Tests para el endpoint de Facturas ---
 
+@patch('src.factura.httpClient.ComandaClient.marcar_comanda_facturada')
 @patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
 @patch('src.factura.validator.FacturaValidator.calcular_total_con_descuento_seña')
-def test_crear_factura_exitoso(mock_calcular_total, mock_obtener_datos, client):
+def test_crear_factura_exitoso(mock_calcular_total, mock_obtener_datos, mock_marcar_facturada, client):
     """
     Test para verificar la creación exitosa de una factura desde id_comanda.
     """
@@ -83,6 +84,7 @@ def test_crear_factura_exitoso(mock_calcular_total, mock_obtener_datos, client):
         ]
     }
     mock_calcular_total.return_value = 400000  # Total calculado
+    mock_marcar_facturada.return_value = None  # Mock exitoso
 
     # Datos de factura: solo id_comanda y medio_pago
     factura_data = {
@@ -217,8 +219,9 @@ def test_filtrar_facturas_por_comanda(mock_obtener_datos, client):
     assert data["total"] == 1
     assert data["items"][0]["id_comanda"] == 1
 
+@patch('src.factura.httpClient.ComandaClient.marcar_comanda_pagada')
 @patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
-def test_marcar_factura_como_pagada(mock_obtener_datos, client):
+def test_marcar_factura_como_pagada(mock_obtener_datos, mock_marcar_pagada, client):
     """
     Test para verificar el cambio de estado a pagada.
     """
@@ -226,6 +229,7 @@ def test_marcar_factura_como_pagada(mock_obtener_datos, client):
         "comanda": {"id": 1, "fecha": "2025-01-01"},
         "detalles": [{"id": 1, "id_comanda": 1, "id_producto": 1, "cantidad": 1, "precio_unitario": 100000}]
     }
+    mock_marcar_pagada.return_value = None  # Mock exitoso
 
     # Crear factura
     response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
@@ -241,8 +245,9 @@ def test_marcar_factura_como_pagada(mock_obtener_datos, client):
     response_get = client.get(f"/factura/{factura_id}")
     assert response_get.json()["estado"] == "pagada"
 
+@patch('src.factura.httpClient.ComandaClient.marcar_comanda_pendiente')
 @patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
-def test_marcar_factura_como_cancelada(mock_obtener_datos, client):
+def test_marcar_factura_como_cancelada(mock_obtener_datos, mock_marcar_pendiente, client):
     """
     Test para verificar el cambio de estado a cancelada.
     """
@@ -250,6 +255,7 @@ def test_marcar_factura_como_cancelada(mock_obtener_datos, client):
         "comanda": {"id": 1, "fecha": "2025-01-01"},
         "detalles": [{"id": 1, "id_comanda": 1, "id_producto": 1, "cantidad": 1, "precio_unitario": 100000}]
     }
+    mock_marcar_pendiente.return_value = None  # Mock exitoso
 
     # Crear factura
     response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
@@ -261,8 +267,9 @@ def test_marcar_factura_como_cancelada(mock_obtener_datos, client):
     data = response.json()
     assert data["estado"] == "cancelada"
 
+@patch('src.factura.httpClient.ComandaClient.marcar_comanda_pendiente')
 @patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
-def test_marcar_factura_como_anulada(mock_obtener_datos, client):
+def test_marcar_factura_como_anulada(mock_obtener_datos, mock_marcar_pendiente, client):
     """
     Test para verificar el cambio de estado a anulada.
     """
@@ -270,6 +277,7 @@ def test_marcar_factura_como_anulada(mock_obtener_datos, client):
         "comanda": {"id": 1, "fecha": "2025-01-01"},
         "detalles": [{"id": 1, "id_comanda": 1, "id_producto": 1, "cantidad": 1, "precio_unitario": 100000}]
     }
+    mock_marcar_pendiente.return_value = None  # Mock exitoso
 
     # Crear factura
     response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
@@ -350,9 +358,10 @@ def test_obtener_factura_inexistente(client):
     response = client.get("/factura/999")
     assert response.status_code == 404
 
+@patch('src.factura.httpClient.ComandaClient.marcar_comanda_facturada')
 @patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
 @patch('src.factura.validator.FacturaValidator.calcular_total_con_descuento_seña')
-def test_crear_factura_sin_reserva(mock_calcular_total, mock_obtener_datos, client):
+def test_crear_factura_sin_reserva(mock_calcular_total, mock_obtener_datos, mock_marcar_facturada, client):
     """
     Test para verificar que factura sin reserva cobra el total completo.
     """
@@ -362,6 +371,7 @@ def test_crear_factura_sin_reserva(mock_calcular_total, mock_obtener_datos, clie
         "detalles": [{"id": 1, "id_comanda": 1, "id_producto": 1, "cantidad": 1, "precio_unitario": 100000}]
     }
     mock_calcular_total.return_value = 100000  # Total completo
+    mock_marcar_facturada.return_value = None  # Mock exitoso
 
     factura_data = {
         "id_comanda": 1,
@@ -375,9 +385,10 @@ def test_crear_factura_sin_reserva(mock_calcular_total, mock_obtener_datos, clie
     assert data["total"] == 100000  # Cobra el total completo
     assert data["monto_seña"] == 0.0  # Reserva sin seña
 
+@patch('src.factura.httpClient.ComandaClient.marcar_comanda_facturada')
 @patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
 @patch('src.factura.validator.FacturaValidator.calcular_total_con_descuento_seña')
-def test_crear_factura_con_reserva_sin_seña(mock_calcular_total, mock_obtener_datos, client):
+def test_crear_factura_con_reserva_sin_seña(mock_calcular_total, mock_obtener_datos, mock_marcar_facturada, client):
     """
     Test para verificar que reserva con monto_seña = 0 cobra el total completo.
     """
@@ -387,6 +398,7 @@ def test_crear_factura_con_reserva_sin_seña(mock_calcular_total, mock_obtener_d
         "detalles": [{"id": 1, "id_comanda": 1, "id_producto": 1, "cantidad": 1, "precio_unitario": 100000}]
     }
     mock_calcular_total.return_value = 100000  # Total completo (sin descuento)
+    mock_marcar_facturada.return_value = None  # Mock exitoso
 
     factura_data = {
         "id_comanda": 1,
@@ -399,10 +411,11 @@ def test_crear_factura_con_reserva_sin_seña(mock_calcular_total, mock_obtener_d
     assert data["id_comanda"] == 1
     assert data["total"] == 100000  # Cobra el total completo
 
+@patch('src.factura.httpClient.ComandaClient.marcar_comanda_facturada')
 @patch('src.factura.validator.FacturaValidator.obtener_descuento_seña')
 @patch('src.factura.validator.FacturaValidator.calcular_total_con_descuento_seña')
 @patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
-def test_crear_factura_con_reserva_con_seña(mock_obtener_datos, mock_calcular_total, mock_obtener_descuento, client):
+def test_crear_factura_con_reserva_con_seña(mock_obtener_datos, mock_calcular_total, mock_obtener_descuento, mock_marcar_facturada, client):
     """
     Test para verificar que se aplica descuento automático si monto_seña > 0.
     """
@@ -413,6 +426,7 @@ def test_crear_factura_con_reserva_con_seña(mock_obtener_datos, mock_calcular_t
     }
     mock_calcular_total.return_value = 50000  # Total con descuento de seña de 50000
     mock_obtener_descuento.return_value = 50000  # Monto de seña aplicado
+    mock_marcar_facturada.return_value = None  # Mock exitoso
 
     factura_data = {
         "id_comanda": 1,
