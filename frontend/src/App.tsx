@@ -12,6 +12,7 @@ import CartaPage from './pages/carta/CartaPage';
 import ComandasPage from './pages/comandas/ComandasPage';
 import FacturasPage from './pages/facturacion/FacturacionPage';
 import ReportesPage from './pages/reportes/ReportesPage';
+import MejoresPlatosPage from './pages/reportes/MejoresPlatosPage';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
           <Route path="comandas" element={<ComandasPage />} />
           <Route path="facturacion" element={<FacturasPage />} />
           <Route path="reportes" element={<ReportesPage />} />
+          <Route path="reportes/mejoresplatos" element={<MejoresPlatosPage />} />
         </Route>
         
         {/* Ruta para "Página no encontrada" (404) */}
