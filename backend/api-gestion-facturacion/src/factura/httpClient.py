@@ -31,3 +31,11 @@ class ComandaClient:
             resp.raise_for_status()
             return None
 
+
+    async def marcar_comanda_anulada(self, id_comanda: int):
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=5) as client:
+            resp = await client.put(
+                f"/comanda/{id_comanda}/anulada",
+            )
+            resp.raise_for_status()
+            return None

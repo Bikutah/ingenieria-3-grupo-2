@@ -142,7 +142,7 @@ async def mark_as_annulled(id_: int, db: Session = Depends(get_db)):
     validator.validar_transicion_estado(obj, models.EstadoFactura.anulada)
 
     try:
-        await ComandaClient().marcar_comanda_pendiente(obj.id_comanda)
+        await ComandaClient().marcar_comanda_anulada(obj.id_comanda)
     except httpx.HTTPError as e:
         db.rollback()
         raise HTTPException(

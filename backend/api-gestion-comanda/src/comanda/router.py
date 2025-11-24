@@ -114,6 +114,16 @@ def pagada(id_: int, db: Session = Depends(get_db)):
     db.commit()
     return
 
+@router.put("/{id_}/anulada", status_code=status.HTTP_204_NO_CONTENT)
+def anulada(id_: int, db: Session = Depends(get_db)):
+    obj = db.get(models.Comanda, id_)
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Comanda no encontrado")
+    obj.estado = models.EstadoComanda.anulada
+    db.add(obj)
+    db.commit()
+    return
+
 @router.get("/{id_comanda}/detalles", response_model=Page[schemas.DetalleComandaOut])
 def get_detalles(id_comanda: int, db: Session = Depends(get_db)):
     query = select(models.DetalleComanda).where(models.DetalleComanda.id_comanda == id_comanda)
