@@ -43,10 +43,12 @@ function ComandaDetalleDialog({
     open,
     onOpenChange,
     comandaId,
+    factura
 }: {
     open: boolean;
     onOpenChange: (v: boolean) => void;
     comandaId: number | null;
+    factura: Factura | null;
 }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -54,6 +56,8 @@ function ComandaDetalleDialog({
 
     const totalComanda = (det: DetalleComanda[] | undefined) =>
         (det ?? []).reduce((acc, d) => acc + (Number(d.cantidad || 0) * Number(d.precio_unitario || 0)), 0);
+
+
 
     useEffect(() => {
         if (!open || !comandaId) return;
@@ -115,16 +119,9 @@ function ComandaDetalleDialog({
 
                                 <div className="flex flex-col">
                                     <span className="text-xs text-muted-foreground">Estado</span>
-                                    <span>
-                                        <span
-                                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${comanda.baja
-                                                    ? "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
-                                                    : "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                                                }`}
-                                        >
-                                            {comanda.baja ? "Cancelada" : "Activa"}
+                                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${estadoBadge(comanda.estado)}`}>
+                                            {comanda.estado}
                                         </span>
-                                    </span>
                                 </div>
                             </div>
 
@@ -160,6 +157,22 @@ function ComandaDetalleDialog({
                                     </TableBody>
                                 </Table>
                             </div>
+
+
+
+                            {/* monto_seña */}
+
+
+                            { factura != null && 
+                            <div className="flex justify-end text-sm">
+                                <div className="grid grid-cols-2 gap-x-6">
+                                    <span className="text-muted-foreground">Seña</span>
+                                    <span className="text-right font-medium">
+                                        {factura.monto_seña}
+                                    </span>
+                                </div>
+                            </div>
+                            }
 
                             {/* Total */}
                             <div className="flex justify-end text-sm">
@@ -712,6 +725,7 @@ export default function FacturasPage() {
                 open={comandaOpen}
                 onOpenChange={setComandaOpen}
                 comandaId={comandaId}
+                factura={selected}
             />
 
         </div>

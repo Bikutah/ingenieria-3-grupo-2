@@ -88,7 +88,7 @@ class FacturaValidator:
         """Valida que no existe una factura para esta comanda"""
         factura_existente = self.db.query(models.Factura).filter(
             models.Factura.id_comanda == id_comanda,
-            models.Factura.estado != models.EstadoFactura.anulada
+            models.Factura.estado != models.EstadoFactura.anulada and models.Factura.estado != models.EstadoFactura.cancelada
         ).first()
 
         if factura_existente:

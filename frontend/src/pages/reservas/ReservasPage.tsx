@@ -565,7 +565,7 @@ export default function ReservasPage() {
           <DialogTrigger asChild>
             <Button onClick={() => handleOpenDialog()}>
               <Plus className="mr-2 h-4 w-4" />
-              Nuevo Reserva
+              Nueva Reserva
             </Button>
           </DialogTrigger>
             <DialogContent

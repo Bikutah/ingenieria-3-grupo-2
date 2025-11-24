@@ -23,7 +23,7 @@ def create(payload: schemas.ComandaCreate, db: Session = Depends(get_db)):
         id_mozo=payload.id_mozo,
         id_reserva=payload.id_reserva,
         fecha=payload.fecha,
-        baja=payload.baja
+        estado=models.EstadoComanda.pendiente
     )
     db.add(db_comanda)
     db.flush()
@@ -79,7 +79,37 @@ def delete(id_: int, db: Session = Depends(get_db)):
     obj = db.get(models.Comanda, id_)
     if obj is None:
         raise HTTPException(status_code=404, detail="Comanda no encontrado")
-    obj.baja = True
+    obj.estado = models.EstadoComanda.anulada
+    db.add(obj)
+    db.commit()
+    return
+
+@router.put("/{id_}/facturar", status_code=status.HTTP_204_NO_CONTENT)
+def facturar(id_: int, db: Session = Depends(get_db)):
+    obj = db.get(models.Comanda, id_)
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Comanda no encontrado")
+    obj.estado = models.EstadoComanda.facturada
+    db.add(obj)
+    db.commit()
+    return
+
+@router.put("/{id_}/pendiente", status_code=status.HTTP_204_NO_CONTENT)
+def pendiente(id_: int, db: Session = Depends(get_db)):
+    obj = db.get(models.Comanda, id_)
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Comanda no encontrado")
+    obj.estado = models.EstadoComanda.pendiente
+    db.add(obj)
+    db.commit()
+    return
+
+@router.put("/{id_}/pagada", status_code=status.HTTP_204_NO_CONTENT)
+def pagada(id_: int, db: Session = Depends(get_db)):
+    obj = db.get(models.Comanda, id_)
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Comanda no encontrado")
+    obj.estado = models.EstadoComanda.pagada
     db.add(obj)
     db.commit()
     return
