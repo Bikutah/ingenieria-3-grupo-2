@@ -126,8 +126,9 @@ def test_crear_factura_sin_detalles_comanda(mock_obtener_datos, client):
     assert response.status_code == 400  # Error de validación por comanda sin detalles
     assert "sin detalles" in response.json()["detail"]
 
+@patch('src.factura.httpClient.ComandaClient.marcar_comanda_facturada')
 @patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
-def test_obtener_lista_de_facturas(mock_obtener_datos, client):
+def test_obtener_lista_de_facturas(mock_obtener_datos, mock_marcar_facturada, client):
     """
     Test para verificar que se puede obtener una lista paginada de facturas.
     """
@@ -136,6 +137,7 @@ def test_obtener_lista_de_facturas(mock_obtener_datos, client):
         "comanda": {"id": 1, "fecha": "2025-01-01"},
         "detalles": [{"id": 1, "id_comanda": 1, "id_producto": 1, "cantidad": 1, "precio_unitario": 100000}]
     }
+    mock_marcar_facturada.return_value = None  # Mock exitoso
 
     # Crear primera factura
     client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
@@ -155,8 +157,9 @@ def test_obtener_lista_de_facturas(mock_obtener_datos, client):
     assert data["total"] == 2
     assert len(data["items"]) == 2
 
+@patch('src.factura.httpClient.ComandaClient.marcar_comanda_facturada')
 @patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
-def test_filtrar_facturas_por_estado(mock_obtener_datos, client):
+def test_filtrar_facturas_por_estado(mock_obtener_datos, mock_marcar_facturada, client):
     """
     Test para verificar el filtro de facturas por estado.
     """
@@ -165,6 +168,7 @@ def test_filtrar_facturas_por_estado(mock_obtener_datos, client):
         "comanda": {"id": 1, "fecha": "2025-01-01"},
         "detalles": [{"id": 1, "id_comanda": 1, "id_producto": 1, "cantidad": 1, "precio_unitario": 100000}]
     }
+    mock_marcar_facturada.return_value = None  # Mock exitoso
 
     # Crear primera factura
     response1 = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
@@ -189,8 +193,9 @@ def test_filtrar_facturas_por_estado(mock_obtener_datos, client):
     assert data["total"] == 1  # Solo una factura pendiente
     assert data["items"][0]["estado"] == "pendiente"
 
+@patch('src.factura.httpClient.ComandaClient.marcar_comanda_facturada')
 @patch('src.factura.validator.FacturaValidator.obtener_datos_comanda')
-def test_filtrar_facturas_por_comanda(mock_obtener_datos, client):
+def test_filtrar_facturas_por_comanda(mock_obtener_datos, mock_marcar_facturada, client):
     """
     Test para verificar el filtro de facturas por id_comanda.
     """
@@ -199,6 +204,7 @@ def test_filtrar_facturas_por_comanda(mock_obtener_datos, client):
         "comanda": {"id": 1, "fecha": "2025-01-01"},
         "detalles": [{"id": 1, "id_comanda": 1, "id_producto": 1, "cantidad": 1, "precio_unitario": 100000}]
     }
+    mock_marcar_facturada.return_value = None  # Mock exitoso
 
     # Crear primera factura
     client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
@@ -231,9 +237,14 @@ def test_marcar_factura_como_pagada(mock_obtener_datos, mock_marcar_pagada, clie
     }
     mock_marcar_pagada.return_value = None  # Mock exitoso
 
-    # Crear factura
-    response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
-    factura_id = response_creacion.json()["id"]
+    # Agregar mock para crear factura
+    with patch('src.factura.httpClient.ComandaClient.marcar_comanda_facturada') as mock_marcar_facturada:
+        mock_marcar_facturada.return_value = None
+        # Crear factura
+        response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
+        factura_id = response_creacion.json()["id"]
+
+    # Marcar como pagada
 
     # Marcar como pagada
     response = client.put(f"/factura/{factura_id}/pagar")
@@ -257,9 +268,12 @@ def test_marcar_factura_como_cancelada(mock_obtener_datos, mock_marcar_pendiente
     }
     mock_marcar_pendiente.return_value = None  # Mock exitoso
 
-    # Crear factura
-    response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
-    factura_id = response_creacion.json()["id"]
+    # Agregar mock para crear factura
+    with patch('src.factura.httpClient.ComandaClient.marcar_comanda_facturada') as mock_marcar_facturada:
+        mock_marcar_facturada.return_value = None
+        # Crear factura
+        response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
+        factura_id = response_creacion.json()["id"]
 
     # Marcar como cancelada
     response = client.put(f"/factura/{factura_id}/cancelar")
@@ -279,9 +293,12 @@ def test_marcar_factura_como_anulada(mock_obtener_datos, mock_marcar_pendiente, 
     }
     mock_marcar_pendiente.return_value = None  # Mock exitoso
 
-    # Crear factura
-    response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
-    factura_id = response_creacion.json()["id"]
+    # Agregar mock para crear factura
+    with patch('src.factura.httpClient.ComandaClient.marcar_comanda_facturada') as mock_marcar_facturada:
+        mock_marcar_facturada.return_value = None
+        # Crear factura
+        response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
+        factura_id = response_creacion.json()["id"]
 
     # Marcar como anulada
     response = client.put(f"/factura/{factura_id}/anular")
@@ -300,9 +317,13 @@ def test_no_pagar_factura_ya_pagada(mock_obtener_datos, client):
     }
 
     # Crear y pagar factura
-    response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
-    factura_id = response_creacion.json()["id"]
-    client.put(f"/factura/{factura_id}/pagar")
+    with patch('src.factura.httpClient.ComandaClient.marcar_comanda_facturada') as mock_marcar_facturada, \
+         patch('src.factura.httpClient.ComandaClient.marcar_comanda_pagada') as mock_marcar_pagada:
+        mock_marcar_facturada.return_value = None
+        mock_marcar_pagada.return_value = None
+        response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
+        factura_id = response_creacion.json()["id"]
+        client.put(f"/factura/{factura_id}/pagar")
 
     # Intentar pagar nuevamente
     response = client.put(f"/factura/{factura_id}/pagar")
@@ -320,9 +341,13 @@ def test_no_cancelar_factura_ya_pagada(mock_obtener_datos, client):
     }
 
     # Crear y pagar factura
-    response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
-    factura_id = response_creacion.json()["id"]
-    client.put(f"/factura/{factura_id}/pagar")
+    with patch('src.factura.httpClient.ComandaClient.marcar_comanda_facturada') as mock_marcar_facturada, \
+         patch('src.factura.httpClient.ComandaClient.marcar_comanda_pagada') as mock_marcar_pagada:
+        mock_marcar_facturada.return_value = None
+        mock_marcar_pagada.return_value = None
+        response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
+        factura_id = response_creacion.json()["id"]
+        client.put(f"/factura/{factura_id}/pagar")
 
     # Intentar cancelar
     response = client.put(f"/factura/{factura_id}/cancelar")
@@ -340,8 +365,10 @@ def test_obtener_factura_por_id(mock_obtener_datos, client):
     }
 
     # Crear factura
-    response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
-    factura_id = response_creacion.json()["id"]
+    with patch('src.factura.httpClient.ComandaClient.marcar_comanda_facturada') as mock_marcar_facturada:
+        mock_marcar_facturada.return_value = None
+        response_creacion = client.post("/factura/", json={"id_comanda": 1, "medio_pago": "efectivo"})
+        factura_id = response_creacion.json()["id"]
 
     # Obtener factura
     response = client.get(f"/factura/{factura_id}")
