@@ -8,7 +8,8 @@ export type EstadoFactura = typeof ESTADOS_FACTURA[number];
 export type Factura = {
   id: number;              
   id_comanda: number;
-  total: number;          
+  total: number;        
+  monto_seña: number; 
   medio_pago: MedioPago;
   estado: EstadoFactura;
   detalles_factura?: string | null;

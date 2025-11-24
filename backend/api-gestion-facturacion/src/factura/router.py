@@ -11,6 +11,10 @@ from fastapi_filter import FilterDepends
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlalchemy import paginate
 
+import httpx
+
+from .httpClient import ComandaClient
+
 router = APIRouter()
 
 @router.post("/", response_model=schemas.FacturaOut, status_code=status.HTTP_201_CREATED)
@@ -50,6 +54,14 @@ async def create(payload: schemas.FacturaCreate, db: Session = Depends(get_db)):
         )
         db.add(db_detalle)
 
+    try:
+        await ComandaClient().marcar_comanda_facturada(payload.id_comanda)
+    except httpx.HTTPError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail=f"No se pudo actualizar el estado de la comanda: {str(e)}",
+        )
     db.commit()
     db.refresh(db_factura)
     return db_factura
@@ -71,7 +83,7 @@ def get_one(id_: int, db: Session = Depends(get_db)):
     return obj
 
 @router.put("/{id_}/pagar", response_model=schemas.FacturaOut)
-def mark_as_paid(id_: int, db: Session = Depends(get_db)):
+async def mark_as_paid(id_: int, db: Session = Depends(get_db)):
     obj = db.get(models.Factura, id_)
     if obj is None:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
@@ -80,12 +92,24 @@ def mark_as_paid(id_: int, db: Session = Depends(get_db)):
     validator.validar_transicion_estado(obj, models.EstadoFactura.pagada)
 
     obj.estado = models.EstadoFactura.pagada
+
+    obj.id_comanda
+
+    try:
+        await ComandaClient().marcar_comanda_pagada(obj.id_comanda)
+    except httpx.HTTPError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail=f"No se pudo actualizar el estado de la comanda: {str(e)}",
+        )
+
     db.commit()
     db.refresh(obj)
     return obj
 
 @router.put("/{id_}/cancelar", response_model=schemas.FacturaOut)
-def mark_as_cancelled(id_: int, db: Session = Depends(get_db)):
+async def mark_as_cancelled(id_: int, db: Session = Depends(get_db)):
     obj = db.get(models.Factura, id_)
     if obj is None:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
@@ -94,18 +118,38 @@ def mark_as_cancelled(id_: int, db: Session = Depends(get_db)):
     validator.validar_transicion_estado(obj, models.EstadoFactura.cancelada)
 
     obj.estado = models.EstadoFactura.cancelada
+
+    try:
+        await ComandaClient().marcar_comanda_pendiente(obj.id_comanda)
+    except httpx.HTTPError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail=f"No se pudo actualizar el estado de la comanda: {str(e)}",
+        )
+
     db.commit()
     db.refresh(obj)
     return obj
 
 @router.put("/{id_}/anular", response_model=schemas.FacturaOut)
-def mark_as_annulled(id_: int, db: Session = Depends(get_db)):
+async def mark_as_annulled(id_: int, db: Session = Depends(get_db)):
     obj = db.get(models.Factura, id_)
     if obj is None:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
 
     validator = FacturaValidator(db)
     validator.validar_transicion_estado(obj, models.EstadoFactura.anulada)
+
+    try:
+        await ComandaClient().marcar_comanda_pendiente(obj.id_comanda)
+    except httpx.HTTPError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail=f"No se pudo actualizar el estado de la comanda: {str(e)}",
+    )
+
 
     obj.estado = models.EstadoFactura.anulada
     db.commit()

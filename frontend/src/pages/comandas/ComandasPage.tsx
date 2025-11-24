@@ -53,7 +53,7 @@ import {
 } from "@/components/ui/command"
 import { Plus, Trash2, Check, ChevronsUpDown, BadgeDollarSign } from "lucide-react"
 
-import type { Comanda } from "@/services/comandas/types/Comanda"
+import type { Comanda, EstadoComanda } from "@/services/comandas/types/Comanda"
 import type { ComandasListParams } from "@/services/comandas/types/Comanda"
 import type { DetalleComanda } from "@/services/comandas/types/DetalleComanda"
 import { comandasService } from "@/services/comandas/api/ComandaService"
@@ -87,6 +87,20 @@ type ComandaExtended = Comanda & {
   detalles_comanda?: DetalleComanda[]
 }
 
+const isPending = (c: Comanda) => c.estado === "pendiente"
+const estadoBadge = (estado: EstadoComanda) => {
+  switch (estado) {
+    case "pendiente":
+      return "bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300"
+    case "pagada":
+      return "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+    case "cancelada":
+      return "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
+    case "anulada":
+      return "bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300"
+  }
+}
+
 export default function ComandasPage() {
   const [comandas, setComandas] = useState<Comanda[]>([])
   const [page, setPage] = useState(1)
@@ -100,7 +114,7 @@ export default function ComandasPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // NUEVO: medio de pago para facturación
+  // medio de pago para facturación
   const [medioPago, setMedioPago] = useState<MedioPago | null>(null)
 
   const [formData, setFormData] = useState<Omit<ComandaExtended, "id">>({
@@ -108,7 +122,7 @@ export default function ComandasPage() {
     id_mesa: 0,
     id_mozo: 0,
     id_reserva: 0,
-    baja: false,
+    estado: "pendiente",
     detalles_comanda: [],
   })
 
@@ -117,7 +131,8 @@ export default function ComandasPage() {
     order_by: ["-id"],
   }
 
-  const [filters, setFilters] = useState<Omit<ComandasListParams, "page" | "size">>(DEFAULT_FILTERS)
+  const [filters, setFilters] =
+    useState<Omit<ComandasListParams, "page" | "size">>(DEFAULT_FILTERS)
 
   // Validación
   const isISODate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v)
@@ -150,7 +165,9 @@ export default function ComandasPage() {
     if (!data.id_mesa || data.id_mesa <= 0) errors.id_mesa = "Elegí una mesa"
     if (!data.id_mozo || data.id_mozo <= 0) errors.id_mozo = "Elegí un mozo"
 
-    const tieneProductos = (data.detalles_comanda ?? []).some(d => (d.cantidad ?? 0) > 0)
+    const tieneProductos = (data.detalles_comanda ?? []).some(
+      (d) => (d.cantidad ?? 0) > 0,
+    )
     if (!tieneProductos) {
       errors.detalles = "Agregá al menos un producto con cantidad > 0"
     }
@@ -174,7 +191,11 @@ export default function ComandasPage() {
     async (p: number, s = size) => {
       setLoading(true)
       try {
-        const { items, total, page, pages, size } = await comandasService.list({ page: p, size: s, ...filters })
+        const { items, total, page, pages, size } = await comandasService.list({
+          page: p,
+          size: s,
+          ...filters,
+        })
         setComandas(items)
         setTotal(total ?? 0)
         setPage(page ?? p)
@@ -186,7 +207,7 @@ export default function ComandasPage() {
         setLoading(false)
       }
     },
-    [size, filters]
+    [size, filters],
   )
 
   // --- Mesas combobox ---
@@ -195,25 +216,23 @@ export default function ComandasPage() {
   const [mesaOpen, setMesaOpen] = useState(false)
   const [mesaQuery, setMesaQuery] = useState("")
 
-  const mesaLabel = (m: Mesas) => `Mesa ${m.numero} (#${m.id}) - ${m.cantidad} sillas`
+  const mesaLabel = (m: Mesas) =>
+    `Mesa ${m.numero} (#${m.id}) - ${m.cantidad} sillas`
 
-  const loadMesas = useCallback(
-    async (q?: string) => {
-      setMesasLoading(true)
-      try {
-        const params: any = { baja: false, page: 1, size: 50 }
-        if (q && q.trim()) params.q = q.trim()
-        const res = await mesasService.list(params)
-        setMesas(res.items ?? [])
-      } catch (e) {
-        console.error("Error cargando mesas:", e)
-        setMesas([])
-      } finally {
-        setMesasLoading(false)
-      }
-    },
-    []
-  )
+  const loadMesas = useCallback(async (q?: string) => {
+    setMesasLoading(true)
+    try {
+      const params: any = { baja: false, page: 1, size: 50 }
+      if (q && q.trim()) params.q = q.trim()
+      const res = await mesasService.list(params)
+      setMesas(res.items ?? [])
+    } catch (e) {
+      console.error("Error cargando mesas:", e)
+      setMesas([])
+    } finally {
+      setMesasLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -234,23 +253,20 @@ export default function ComandasPage() {
 
   const mozoLabel = (m: Mozo) => `#${m.id} · ${m.nombre} ${m.apellido}`
 
-  const loadMozos = useCallback(
-    async (q?: string) => {
-      setMozosLoading(true)
-      try {
-        const params: any = { baja: false, page: 1, size: 50 }
-        if (q && q.trim()) params.q = q.trim()
-        const res = await mozoService.list(params)
-        setMozos(res.items ?? [])
-      } catch (e) {
-        console.error("Error cargando mozos:", e)
-        setMozos([])
-      } finally {
-        setMozosLoading(false)
-      }
-    },
-    []
-  )
+  const loadMozos = useCallback(async (q?: string) => {
+    setMozosLoading(true)
+    try {
+      const params: any = { baja: false, page: 1, size: 50 }
+      if (q && q.trim()) params.q = q.trim()
+      const res = await mozoService.list(params)
+      setMozos(res.items ?? [])
+    } catch (e) {
+      console.error("Error cargando mozos:", e)
+      setMozos([])
+    } finally {
+      setMozosLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -272,23 +288,20 @@ export default function ComandasPage() {
   const reservaLabel = (r: Reserva) =>
     `#${r.id} · ${r.fecha} ${r.horario} - Mesa ${r.id_mesa} (${r.cantidad_personas} pers.)`
 
-  const loadReservas = useCallback(
-    async (q?: string) => {
-      setReservasLoading(true)
-      try {
-        const params: any = { baja: false, page: 1, size: 50 }
-        if (q && q.trim()) params.q = q.trim()
-        const res = await reservasService.list(params)
-        setReservas(res.items ?? [])
-      } catch (e) {
-        console.error("Error cargando reservas:", e)
-        setReservas([])
-      } finally {
-        setReservasLoading(false)
-      }
-    },
-    []
-  )
+  const loadReservas = useCallback(async (q?: string) => {
+    setReservasLoading(true)
+    try {
+      const params: any = { baja: false, page: 1, size: 50 }
+      if (q && q.trim()) params.q = q.trim()
+      const res = await reservasService.list(params)
+      setReservas(res.items ?? [])
+    } catch (e) {
+      console.error("Error cargando reservas:", e)
+      setReservas([])
+    } finally {
+      setReservasLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -308,29 +321,26 @@ export default function ComandasPage() {
   const [productoQuery, setProductoQuery] = useState("")
 
   const selectedIds = new Set(
-    formData.detalles_comanda?.map(d => d.id_producto) ?? []
+    formData.detalles_comanda?.map((d) => d.id_producto) ?? [],
   )
 
   const productoLabel = (p: Producto) =>
     `#${p.id} · ${p.nombre} — $${p.precio}${p.cm3 ? ` · ${p.cm3}cm³` : ""}`
 
-  const loadProductos = useCallback(
-    async (q?: string) => {
-      setProductosLoading(true)
-      try {
-        const params: any = { activo: true, page: 1, size: 50 }
-        if (q && q.trim()) params.q = q.trim()
-        const res = await productoService.list(params)
-        setProductos(res.items ?? [])
-      } catch (e) {
-        console.error("Error cargando productos:", e)
-        setProductos([])
-      } finally {
-        setProductosLoading(false)
-      }
-    },
-    []
-  )
+  const loadProductos = useCallback(async (q?: string) => {
+    setProductosLoading(true)
+    try {
+      const params: any = { activo: true, page: 1, size: 50 }
+      if (q && q.trim()) params.q = q.trim()
+      const res = await productoService.list(params)
+      setProductos(res.items ?? [])
+    } catch (e) {
+      console.error("Error cargando productos:", e)
+      setProductos([])
+    } finally {
+      setProductosLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -344,17 +354,20 @@ export default function ComandasPage() {
   }, [productoOpen, loadProductos])
 
   const addOrIncProducto = (prodId: number, prodPrecio: number) => {
-    setFormData(fd => {
+    setFormData((fd) => {
       const detalles_comanda = [...(fd.detalles_comanda ?? [])]
-      const idx = detalles_comanda.findIndex(d => d.id_producto === prodId)
+      const idx = detalles_comanda.findIndex((d) => d.id_producto === prodId)
       if (idx >= 0) {
-        detalles_comanda[idx] = { ...detalles_comanda[idx], cantidad: (detalles_comanda[idx].cantidad ?? 0) + 1 }
+        detalles_comanda[idx] = {
+          ...detalles_comanda[idx],
+          cantidad: (detalles_comanda[idx].cantidad ?? 0) + 1,
+        }
       } else {
         detalles_comanda.push({
           id: 0,
           id_producto: prodId,
           cantidad: 1,
-          precio_unitario: prodPrecio
+          precio_unitario: prodPrecio,
         })
       }
       return { ...fd, detalles_comanda }
@@ -374,31 +387,51 @@ export default function ComandasPage() {
       id_mesa: 0,
       id_mozo: 0,
       id_reserva: 0,
-      baja: false,
+      estado: "pendiente",
       detalles_comanda: [],
     })
 
-    if (comanda) {
-      setSelectedComanda(comanda)
-      setLoading(true)
+if (comanda) {
+  setSelectedComanda(comanda)
+  setLoading(true)
+  try {
+    const fullComanda = await comandasService.getById(comanda.id)
+
+    // setear datos de la comanda
+    setFormData({
+      fecha: fullComanda.fecha,
+      id_mesa: fullComanda.id_mesa,
+      id_mozo: fullComanda.id_mozo,
+      id_reserva: fullComanda.id_reserva,
+      estado: fullComanda.estado,
+      detalles_comanda: fullComanda.detalles_comanda ?? [],
+    })
+
+    // 👇 NUEVO: si la comanda tiene reserva, la cargamos por id
+    if (fullComanda.id_reserva && fullComanda.id_reserva > 0) {
       try {
-        const fullComanda = await comandasService.getById(comanda.id)
-        setFormData({
-          fecha: fullComanda.fecha,
-          id_mesa: fullComanda.id_mesa,
-          id_mozo: fullComanda.id_mozo,
-          id_reserva: fullComanda.id_reserva,
-          baja: fullComanda.baja,
-          detalles_comanda: fullComanda.detalles_comanda ?? [],
+        const res = await reservasService.list({
+          id: fullComanda.id_reserva,
+          page: 1,
+          size: 1,
         })
-      } catch (e) {
-        console.error("Error cargando detalles de comanda:", e)
-        toast.error("No se pudieron cargar los detalles para edición.", { description: extractApiErrorMessage(e) })
-        setIsDialogOpen(false)
-      } finally {
-        setLoading(false)
+        setReservas(res.items ?? [])
+      } catch (err) {
+        console.error("Error cargando reserva asociada:", err)
+        // opcional: mostrar un toast, pero no rompemos el flujo
       }
     }
+  } catch (e) {
+    console.error("Error cargando detalles de comanda:", e)
+    toast.error("No se pudieron cargar los detalles para edición.", {
+      description: extractApiErrorMessage(e),
+    })
+    setIsDialogOpen(false)
+  } finally {
+    setLoading(false)
+  }
+}
+
   }
 
   const handleSave = async () => {
@@ -425,13 +458,14 @@ export default function ComandasPage() {
       id_mesa: formData.id_mesa,
       id_mozo: formData.id_mozo,
       id_reserva: formData.id_reserva || 0,
-      baja: formData.baja,
-      detalles_comanda: formData.detalles_comanda?.map(d => ({
-        id: d.id,
-        id_producto: d.id_producto,
-        cantidad: d.cantidad,
-        precio_unitario: d.precio_unitario,
-      })) ?? []
+      estado: formData.estado,
+      detalles_comanda:
+        formData.detalles_comanda?.map((d) => ({
+          id: d.id,
+          id_producto: d.id_producto,
+          cantidad: d.cantidad,
+          precio_unitario: d.precio_unitario,
+        })) ?? [],
     }
 
     try {
@@ -445,16 +479,24 @@ export default function ComandasPage() {
           medio_pago: medioPago!, // validado arriba
         })
 
-        setComandas(prev => prev.map(c => (c.id === selectedComanda.id ? updated : c)))
-        toast.success("Comanda facturada", { description: `#${updated?.id ?? selectedComanda.id}` })
+        setComandas((prev) =>
+          prev.map((c) => (c.id === selectedComanda.id ? updated : c)),
+        )
+        toast.success("Comanda facturada", {
+          description: `#${updated?.id ?? selectedComanda.id}`,
+        })
       } else {
         const created = await comandasService.create(payload)
         await loadPage(1, size)
-        toast.success("Comanda creada", { description: `#${created?.id ?? "?"}` })
+        toast.success("Comanda creada", {
+          description: `#${created?.id ?? "?"}`,
+        })
       }
       setIsDialogOpen(false)
     } catch (e) {
-      toast.error("No se pudo guardar", { description: extractApiErrorMessage(e) })
+      toast.error("No se pudo guardar", {
+        description: extractApiErrorMessage(e),
+      })
       console.error(e)
     } finally {
       setSaving(false)
@@ -465,13 +507,15 @@ export default function ComandasPage() {
     if (!comandaToDelete) return
     try {
       await comandasService.remove(comandaToDelete)
-      setComandas(prev => prev.filter(c => c.id !== comandaToDelete))
+      setComandas((prev) => prev.filter((c) => c.id !== comandaToDelete))
       setIsDeleteDialogOpen(false)
       setComandaToDelete(null)
       toast.success("Comanda eliminada")
     } catch (e) {
       console.error("Error eliminando comanda:", e)
-      toast.error("No se pudo eliminar", { description: extractApiErrorMessage(e) })
+      toast.error("No se pudo eliminar", {
+        description: extractApiErrorMessage(e),
+      })
     }
   }
 
@@ -486,7 +530,11 @@ export default function ComandasPage() {
     ;(async () => {
       setLoading(true)
       try {
-        const data = await comandasService.list({ page: 1, size: PAGE_SIZE, ...filters })
+        const data = await comandasService.list({
+          page: 1,
+          size: PAGE_SIZE,
+          ...filters,
+        })
         if (!mounted) return
         setComandas(data.items)
         setTotal(data.total ?? 0)
@@ -501,9 +549,25 @@ export default function ComandasPage() {
         if (mounted) setLoading(false)
       }
     })()
-    return () => { mounted = false }
+    return () => {
+      mounted = false
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // reserva actualmente seleccionada (para mostrar seña)
+  const selectedReserva = reservas.find((r) => r.id === formData.id_reserva)
+  const senia = selectedReserva?.menu_reserva?.monto_seña ?? 0
+
+  // total de la comanda (productos)
+  const totalComanda = (formData.detalles_comanda ?? []).reduce(
+    (acc, d) => acc + (d.cantidad ?? 0) * (d.precio_unitario ?? 0),
+    0,
+  )
+
+  // restante a cobrar (puedes clamp a 0 si querés evitar negativos)
+  const restante = Math.max(totalComanda - senia, 0)
+
 
   return (
     <div className="space-y-6">
@@ -527,14 +591,225 @@ export default function ComandasPage() {
               Nueva Comanda
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
+          <DialogContent className="overflow-hidden rounded-2xl border p-4 sm:max-w-[600px]">
             <DialogHeader>
-              <DialogTitle>{selectedComanda ? "Facturar Comanda" : "Nueva Comanda"}</DialogTitle>
+              <DialogTitle>
+                {selectedComanda ? "Facturar Comanda" : "Nueva Comanda"}
+              </DialogTitle>
               <DialogDescription>
-                {selectedComanda ? "Modifica los datos de la comanda si es necesario y elegí el método de pago" : "Completa los datos de la nueva comanda"}
+                {selectedComanda
+                  ? "Modifica los datos de la comanda si es necesario y elegí el método de pago"
+                  : "Completa los datos de la nueva comanda"}
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="max-h-[60vh] overflow-y-auto p-6 space-y-6">
+
+{/* Mozo */}
+              <div className="grid gap-1.5">
+                <Label htmlFor="id_mozo">Mozo</Label>
+                <Popover open={mozoOpen} onOpenChange={setMozoOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant={showError("id_mozo") ? "destructive" : "outline"}
+                      role="combobox"
+                      className="w-full justify-between"
+                      onBlur={() => markTouched("id_mozo")}
+                      aria-invalid={showError("id_mozo")}
+                    >
+                      {(() => {
+                        const selected = mozos.find(
+                          (m) => m.id === formData.id_mozo,
+                        )
+                        return selected
+                          ? mozoLabel(selected)
+                          : "Seleccioná un mozo…"
+                      })()}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                    <Command>
+                      <CommandInput
+                        placeholder="Buscar mozo…"
+                        value={mozoQuery}
+                        onValueChange={setMozoQuery}
+                      />
+                      <CommandList>
+                        {mozosLoading ? (
+                          <div className="p-3 text-sm text-muted-foreground">
+                            Cargando…
+                          </div>
+                        ) : (
+                          <>
+                            <CommandEmpty>
+                              No se encontraron mozos
+                            </CommandEmpty>
+                            <CommandGroup heading="Mozos">
+                              {mozos.map((m) => {
+                                const selected = formData.id_mozo === m.id
+                                return (
+                                  <CommandItem
+                                    key={m.id}
+                                    value={String(m.id)}
+                                    onSelect={() => {
+                                      setFormData((fd) => ({
+                                        ...fd,
+                                        id_mozo: m.id,
+                                      }))
+                                      setTouched((t) => ({
+                                        ...t,
+                                        id_mozo: true,
+                                      }))
+                                      setMozoOpen(false)
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${
+                                        selected
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      }`}
+                                    />
+                                    {mozoLabel(m)}
+                                  </CommandItem>
+                                )
+                              })}
+                            </CommandGroup>
+                          </>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {showError("id_mozo") && (
+                  <p className="text-sm text-red-600">{formErrors.id_mozo}</p>
+                )}
+              </div>
+
+              {/* Reserva (primero) */}
+              <div className="grid gap-1.5">
+                <Label htmlFor="id_reserva">Reserva (opcional)</Label>
+                <Popover open={reservaOpen} onOpenChange={setReservaOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      {selectedReserva ? reservaLabel(selectedReserva) : "Sin reserva"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                    <Command>
+                      <CommandInput
+                        placeholder="Buscar reserva…"
+                        value={reservaQuery}
+                        onValueChange={setReservaQuery}
+                      />
+                      <CommandList>
+                        {reservasLoading ? (
+                          <div className="p-3 text-sm text-muted-foreground">
+                            Cargando…
+                          </div>
+                        ) : (
+                          <>
+                            <CommandEmpty>No se encontraron reservas</CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                value="0"
+                                onSelect={() => {
+                                  setFormData((fd) => ({
+                                    ...fd,
+                                    id_reserva: 0,
+                                  }))
+                                  setReservaOpen(false)
+                                }}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    formData.id_reserva === 0
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  }`}
+                                />
+                                Sin reserva
+                              </CommandItem>
+                            </CommandGroup>
+                            <CommandGroup heading="Reservas">
+                              {reservas.map((r) => {
+                                const selected = formData.id_reserva === r.id
+                                return (
+                                  <CommandItem
+                                    key={r.id}
+                                    value={String(r.id)}
+                                    onSelect={() => {
+                                      setFormData((fd) => {
+                                        // fusionar productos actuales con los del menú de reserva
+                                        const actuales = [...(fd.detalles_comanda ?? [])]
+                                        const detallesMenu = r.menu_reserva?.detalles_menu ?? []
+
+                                        const fusionados = [...actuales]
+
+                                        for (const dm of detallesMenu) {
+                                          const idx = fusionados.findIndex(
+                                            (det) => det.id_producto === dm.id_producto,
+                                          )
+                                          if (idx >= 0) {
+                                            fusionados[idx] = {
+                                              ...fusionados[idx],
+                                              cantidad:
+                                                (fusionados[idx].cantidad ?? 0) +
+                                                dm.cantidad,
+                                              precio_unitario: dm.precio,
+                                            }
+                                          } else {
+                                            fusionados.push({
+                                              id: 0,
+                                              id_producto: dm.id_producto,
+                                              cantidad: dm.cantidad,
+                                              precio_unitario: dm.precio,
+                                            })
+                                          }
+                                        }
+
+                                        return {
+                                          ...fd,
+                                          id_reserva: r.id,
+                                          fecha: r.fecha, // setear fecha desde la reserva
+                                          id_mesa: r.id_mesa, // setear mesa desde la reserva
+                                          detalles_comanda: fusionados,
+                                        }
+                                      })
+                                      setReservaOpen(false)
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${
+                                        selected ? "opacity-100" : "opacity-0"
+                                      }`}
+                                    />
+                                    {reservaLabel(r)}
+                                  </CommandItem>
+                                )
+                              })}
+                            </CommandGroup>
+                          </>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                {senia > 0 && (
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    Seña asociada a la reserva: ${senia}
+                  </p>
+                )}
+              </div>
+
               {/* Fecha */}
               <div className="grid gap-1.5">
                 <Label htmlFor="fecha">Fecha</Label>
@@ -542,10 +817,14 @@ export default function ComandasPage() {
                   id="fecha"
                   type="date"
                   value={formData.fecha}
-                  onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, fecha: e.target.value })
+                  }
                   onBlur={() => markTouched("fecha")}
                   aria-invalid={!!(touched.fecha && formErrors.fecha)}
-                  className={touched.fecha && formErrors.fecha ? errorClass : undefined}
+                  className={
+                    touched.fecha && formErrors.fecha ? errorClass : undefined
+                  }
                 />
                 {touched.fecha && formErrors.fecha && (
                   <p className="text-sm text-red-600">{formErrors.fecha}</p>
@@ -566,8 +845,12 @@ export default function ComandasPage() {
                       aria-invalid={showError("id_mesa")}
                     >
                       {(() => {
-                        const selected = mesas.find((m) => m.id === formData.id_mesa)
-                        return selected ? mesaLabel(selected) : "Seleccioná una mesa…"
+                        const selected = mesas.find(
+                          (m) => m.id === formData.id_mesa,
+                        )
+                        return selected
+                          ? mesaLabel(selected)
+                          : "Seleccioná una mesa…"
                       })()}
                       <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                     </Button>
@@ -581,10 +864,14 @@ export default function ComandasPage() {
                       />
                       <CommandList>
                         {mesasLoading ? (
-                          <div className="p-3 text-sm text-muted-foreground">Cargando…</div>
+                          <div className="p-3 text-sm text-muted-foreground">
+                            Cargando…
+                          </div>
                         ) : (
                           <>
-                            <CommandEmpty>No se encontraron mesas</CommandEmpty>
+                            <CommandEmpty>
+                              No se encontraron mesas
+                            </CommandEmpty>
                             <CommandGroup heading="Mesas">
                               {mesas.map((m) => {
                                 const selected = formData.id_mesa === m.id
@@ -593,12 +880,24 @@ export default function ComandasPage() {
                                     key={m.id}
                                     value={String(m.id)}
                                     onSelect={() => {
-                                      setFormData((fd) => ({ ...fd, id_mesa: m.id }))
-                                      setTouched((t) => ({ ...t, id_mesa: true }))
+                                      setFormData((fd) => ({
+                                        ...fd,
+                                        id_mesa: m.id,
+                                      }))
+                                      setTouched((t) => ({
+                                        ...t,
+                                        id_mesa: true,
+                                      }))
                                       setMesaOpen(false)
                                     }}
                                   >
-                                    <Check className={`mr-2 h-4 w-4 ${selected ? "opacity-100" : "opacity-0"}`} />
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${
+                                        selected
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      }`}
+                                    />
                                     {mesaLabel(m)}
                                   </CommandItem>
                                 )
@@ -615,137 +914,6 @@ export default function ComandasPage() {
                 )}
               </div>
 
-              {/* Mozo */}
-              <div className="grid gap-1.5">
-                <Label htmlFor="id_mozo">Mozo</Label>
-                <Popover open={mozoOpen} onOpenChange={setMozoOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant={showError("id_mozo") ? "destructive" : "outline"}
-                      role="combobox"
-                      className="w-full justify-between"
-                      onBlur={() => markTouched("id_mozo")}
-                      aria-invalid={showError("id_mozo")}
-                    >
-                      {(() => {
-                        const selected = mozos.find((m) => m.id === formData.id_mozo)
-                        return selected ? mozoLabel(selected) : "Seleccioná un mozo…"
-                      })()}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                    <Command>
-                      <CommandInput
-                        placeholder="Buscar mozo…"
-                        value={mozoQuery}
-                        onValueChange={setMozoQuery}
-                      />
-                      <CommandList>
-                        {mozosLoading ? (
-                          <div className="p-3 text-sm text-muted-foreground">Cargando…</div>
-                        ) : (
-                          <>
-                            <CommandEmpty>No se encontraron mozos</CommandEmpty>
-                            <CommandGroup heading="Mozos">
-                              {mozos.map((m) => {
-                                const selected = formData.id_mozo === m.id
-                                return (
-                                  <CommandItem
-                                    key={m.id}
-                                    value={String(m.id)}
-                                    onSelect={() => {
-                                      setFormData((fd) => ({ ...fd, id_mozo: m.id }))
-                                      setTouched((t) => ({ ...t, id_mozo: true }))
-                                      setMozoOpen(false)
-                                    }}
-                                  >
-                                    <Check className={`mr-2 h-4 w-4 ${selected ? "opacity-100" : "opacity-0"}`} />
-                                    {mozoLabel(m)}
-                                  </CommandItem>
-                                )
-                              })}
-                            </CommandGroup>
-                          </>
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                {showError("id_mozo") && (
-                  <p className="text-sm text-red-600">{formErrors.id_mozo}</p>
-                )}
-              </div>
-
-              {/* Reserva (opcional) */}
-              <div className="grid gap-1.5">
-                <Label htmlFor="id_reserva">Reserva (opcional)</Label>
-                <Popover open={reservaOpen} onOpenChange={setReservaOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between"
-                    >
-                      {(() => {
-                        const selected = reservas.find((r) => r.id === formData.id_reserva)
-                        return selected ? reservaLabel(selected) : "Sin reserva"
-                      })()}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                    <Command>
-                      <CommandInput
-                        placeholder="Buscar reserva…"
-                        value={reservaQuery}
-                        onValueChange={setReservaQuery}
-                      />
-                      <CommandList>
-                        {reservasLoading ? (
-                          <div className="p-3 text-sm text-muted-foreground">Cargando…</div>
-                        ) : (
-                          <>
-                            <CommandEmpty>No se encontraron reservas</CommandEmpty>
-                            <CommandGroup>
-                              <CommandItem
-                                value="0"
-                                onSelect={() => {
-                                  setFormData((fd) => ({ ...fd, id_reserva: 0 }))
-                                  setReservaOpen(false)
-                                }}
-                              >
-                                <Check className={`mr-2 h-4 w-4 ${formData.id_reserva === 0 ? "opacity-100" : "opacity-0"}`} />
-                                Sin reserva
-                              </CommandItem>
-                            </CommandGroup>
-                            <CommandGroup heading="Reservas">
-                              {reservas.map((r) => {
-                                const selected = formData.id_reserva === r.id
-                                return (
-                                  <CommandItem
-                                    key={r.id}
-                                    value={String(r.id)}
-                                    onSelect={() => {
-                                      setFormData((fd) => ({ ...fd, id_reserva: r.id }))
-                                      setReservaOpen(false)
-                                    }}
-                                  >
-                                    <Check className={`mr-2 h-4 w-4 ${selected ? "opacity-100" : "opacity-0"}`} />
-                                    {reservaLabel(r)}
-                                  </CommandItem>
-                                )
-                              })}
-                            </CommandGroup>
-                          </>
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
 
               {/* Productos */}
               <div className="grid gap-1.5">
@@ -763,7 +931,7 @@ export default function ComandasPage() {
                       <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                     <Command>
                       <CommandInput
                         placeholder="Buscar por nombre, tipo…"
@@ -772,25 +940,29 @@ export default function ComandasPage() {
                       />
                       <CommandList>
                         {productosLoading ? (
-                          <div className="p-3 text-sm text-muted-foreground">Cargando…</div>
+                          <div className="p-3 text-sm text-muted-foreground">
+                            Cargando…
+                          </div>
                         ) : (
                           <>
                             <CommandEmpty className="p-3">
                               No se encontraron productos
                             </CommandEmpty>
                             <CommandGroup heading="Resultados">
-                              {productos.filter(p => !selectedIds.has(p.id)).map((p) => (
-                                <CommandItem
-                                  key={p.id}
-                                  value={String(p.id)}
-                                  onSelect={() => {
-                                    addOrIncProducto(p.id, p.precio)
-                                    setProductoOpen(false)
-                                  }}
-                                >
-                                  {productoLabel(p)}
-                                </CommandItem>
-                              ))}
+                              {productos
+                                .filter((p) => !selectedIds.has(p.id))
+                                .map((p) => (
+                                  <CommandItem
+                                    key={p.id}
+                                    value={String(p.id)}
+                                    onSelect={() => {
+                                      addOrIncProducto(p.id, p.precio)
+                                      setProductoOpen(false)
+                                    }}
+                                  >
+                                    {productoLabel(p)}
+                                  </CommandItem>
+                                ))}
                             </CommandGroup>
                           </>
                         )}
@@ -812,8 +984,12 @@ export default function ComandasPage() {
                       </TableHeader>
                       <TableBody>
                         {formData.detalles_comanda.map((d) => {
-                          const prod = productos.find(pp => pp.id === d.id_producto)
-                          const label = prod ? productoLabel(prod) : `#${d.id_producto}`
+                          const prod = productos.find(
+                            (pp) => pp.id === d.id_producto,
+                          )
+                          const label = prod
+                            ? productoLabel(prod)
+                            : `#${d.id_producto}`
                           return (
                             <TableRow key={d.id_producto}>
                               <TableCell>{label}</TableCell>
@@ -824,12 +1000,22 @@ export default function ComandasPage() {
                                   value={d.cantidad ?? 0}
                                   className="w-20 text-center"
                                   onChange={(e) => {
-                                    const qty = Math.max(0, Number(e.target.value || 0))
-                                    setFormData(fd => {
-                                      const copy = (fd.detalles_comanda ?? []).map(x =>
-                                        x.id_producto === d.id_producto ? { ...x, cantidad: qty } : x
+                                    const qty = Math.max(
+                                      0,
+                                      Number(e.target.value || 0),
+                                    )
+                                    setFormData((fd) => {
+                                      const copy = (
+                                        fd.detalles_comanda ?? []
+                                      ).map((x) =>
+                                        x.id_producto === d.id_producto
+                                          ? { ...x, cantidad: qty }
+                                          : x,
                                       )
-                                      return { ...fd, detalles_comanda: copy }
+                                      return {
+                                        ...fd,
+                                        detalles_comanda: copy,
+                                      }
                                     })
                                   }}
                                 />
@@ -839,9 +1025,13 @@ export default function ComandasPage() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => {
-                                    setFormData(fd => ({
+                                    setFormData((fd) => ({
                                       ...fd,
-                                      detalles_comanda: (fd.detalles_comanda ?? []).filter(x => x.id_producto !== d.id_producto)
+                                      detalles_comanda:
+                                        (fd.detalles_comanda ?? []).filter(
+                                          (x) =>
+                                            x.id_producto !== d.id_producto,
+                                        ),
                                     }))
                                   }}
                                 >
@@ -855,14 +1045,16 @@ export default function ComandasPage() {
                     </Table>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">Aún no agregaste productos.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Aún no agregaste productos.
+                  </p>
                 )}
                 {touched.detalles && formErrors.detalles && (
                   <p className="text-sm text-red-600">{formErrors.detalles}</p>
                 )}
               </div>
 
-              {/* NUEVO: Método de pago (solo cuando se factura una comanda existente) */}
+              {/* Método de pago (solo cuando se factura una comanda existente) */}
               {selectedComanda && (
                 <div className="grid gap-1.5">
                   <Label htmlFor="medio_pago">Método de pago</Label>
@@ -876,7 +1068,7 @@ export default function ComandasPage() {
                     <SelectContent>
                       <SelectGroup>
                         <SelectLabel>Medios disponibles</SelectLabel>
-                        {MEDIOS_PAGO.map(mp => (
+                        {MEDIOS_PAGO.map((mp) => (
                           <SelectItem key={mp} value={mp}>
                             {mp}
                           </SelectItem>
@@ -893,13 +1085,48 @@ export default function ComandasPage() {
               )}
             </div>
 
+              {/* Resumen de montos: total, seña, restante */}
+  {(totalComanda > 0 || senia > 0) && (
+    <div className="mt-3 rounded-md border bg-muted/40 p-3 text-sm space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span>Total productos</span>
+        <span className="font-semibold">
+          ${totalComanda.toFixed(2)}
+        </span>
+      </div>
+
+      {senia > 0 && (
+        <>
+          <div className="flex items-center justify-between">
+            <span>Seña</span>
+            <span className="font-semibold text-amber-700 dark:text-amber-300">
+              -${senia.toFixed(2)}
+            </span>
+          </div>
+          <div className="mt-1 border-t pt-1 flex items-center justify-between">
+            <span>Restante a cobrar</span>
+            <span className="font-semibold">
+              ${restante.toFixed(2)}
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  )}
+
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
+              <Button
+                variant="outline"
+                onClick={() => setIsDialogOpen(false)}
+                disabled={saving}
+              >
                 Cancelar
               </Button>
               <Button
                 onClick={handleSave}
-                disabled={saving || !isFormValid || (selectedComanda && !medioPago)}
+                disabled={
+                  saving || !isFormValid || (selectedComanda && !medioPago)
+                }
               >
                 {selectedComanda ? "Generar facturación" : "Crear Comanda"}
               </Button>
@@ -920,7 +1147,10 @@ export default function ComandasPage() {
               placeholder="= ID"
               value={filters.id ?? ""}
               onChange={(e) =>
-                setFilters((f) => ({ ...f, id: e.target.value ? Number(e.target.value) : undefined }))
+                setFilters((f) => ({
+                  ...f,
+                  id: e.target.value ? Number(e.target.value) : undefined,
+                }))
               }
             />
           </div>
@@ -934,7 +1164,10 @@ export default function ComandasPage() {
               placeholder="≠ ID"
               value={filters.id__neq ?? ""}
               onChange={(e) =>
-                setFilters((f) => ({ ...f, id__neq: e.target.value ? Number(e.target.value) : undefined }))
+                setFilters((f) => ({
+                  ...f,
+                  id__neq: e.target.value ? Number(e.target.value) : undefined,
+                }))
               }
             />
           </div>
@@ -973,37 +1206,49 @@ export default function ComandasPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {comandas.map((comanda) => {
-              const mozo = mozos.find(m => m.id === comanda.id_mozo);
-              const mesa = mesas.find(m => m.id === comanda.id_mesa);
+            {comandas.map((c) => {
+              const mozo = mozos.find((m) => m.id === c.id_mozo)
+              const mesa = mesas.find((m) => m.id === c.id_mesa)
 
-              const mozoDisplay = mozo ? `${mozo.nombre} ${mozo.apellido}` : `#${comanda.id_mozo}`;
-              const mesaDisplay = mesa ? `${mesa.tipo} (${mesa.numero})` : `#${comanda.id_mesa}`;
+              const mozoDisplay = mozo
+                ? `${mozo.nombre} ${mozo.apellido}`
+                : `#${c.id_mozo}`
+              const mesaDisplay = mesa
+                ? `${mesa.tipo} (${mesa.numero})`
+                : `#${c.id_mesa}`
 
               return (
-                <TableRow key={comanda.id}>
-                  <TableCell className="font-medium">{comanda.id}</TableCell>
-                  <TableCell>{comanda.fecha}</TableCell>
+                <TableRow key={c.id}>
+                  <TableCell className="font-medium">{c.id}</TableCell>
+                  <TableCell>{c.fecha}</TableCell>
                   <TableCell>{mesaDisplay}</TableCell>
                   <TableCell>{mozoDisplay}</TableCell>
-                  <TableCell>{comanda.id_reserva || "-"}</TableCell>
+                  <TableCell>{c.id_reserva || "-"}</TableCell>
                   <TableCell>
                     <span
-                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                        comanda.baja
-                          ? "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
-                          : "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                      }`}
+                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${estadoBadge(
+                        c.estado,
+                      )}`}
                     >
-                      {comanda.baja ? "Cancelada" : "Activa"}
+                      {c.estado}
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button size="sm" className="capitalize" onClick={() => handleOpenDialog(comanda)}>
-                        <BadgeDollarSign className="mr-1 h-4 w-4" /> Facturar
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(comanda.id)}>
+                      {c.estado == "pendiente" && (
+                        <Button
+                          size="sm"
+                          className="capitalize"
+                          onClick={() => handleOpenDialog(c)}
+                        >
+                          <BadgeDollarSign className="mr-1 h-4 w-4" /> Facturar
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openDeleteDialog(c.id)}
+                      >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
@@ -1013,7 +1258,10 @@ export default function ComandasPage() {
             })}
             {!loading && comandas.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell
+                  colSpan={7}
+                  className="text-center text-muted-foreground py-8"
+                >
                   No hay comandas cargadas.
                 </TableCell>
               </TableRow>
@@ -1091,8 +1339,14 @@ export default function ComandasPage() {
                 <PaginationItem>
                   <PaginationPrevious
                     aria-disabled={page <= 1 || loading}
-                    className={page <= 1 || loading ? "pointer-events-none opacity-50" : ""}
-                    onClick={() => page > 1 && !loading && loadPage(page - 1)}
+                    className={
+                      page <= 1 || loading
+                        ? "pointer-events-none opacity-50"
+                        : ""
+                    }
+                    onClick={() =>
+                      page > 1 && !loading && loadPage(page - 1)
+                    }
                   />
                 </PaginationItem>
 
@@ -1105,8 +1359,12 @@ export default function ComandasPage() {
                     <PaginationItem key={p}>
                       <PaginationLink
                         isActive={p === page}
-                        onClick={() => p !== page && !loading && loadPage(p)}
-                        className={loading ? "pointer-events-none opacity-50" : ""}
+                        onClick={() =>
+                          p !== page && !loading && loadPage(p)
+                        }
+                        className={
+                          loading ? "pointer-events-none opacity-50" : ""
+                        }
                       >
                         {p}
                       </PaginationLink>
@@ -1117,8 +1375,14 @@ export default function ComandasPage() {
                 <PaginationItem>
                   <PaginationNext
                     aria-disabled={page >= totalPages || loading}
-                    className={page >= totalPages || loading ? "pointer-events-none opacity-50" : ""}
-                    onClick={() => page < totalPages && !loading && loadPage(page + 1)}
+                    className={
+                      page >= totalPages || loading
+                        ? "pointer-events-none opacity-50"
+                        : ""
+                    }
+                    onClick={() =>
+                      page < totalPages && !loading && loadPage(page + 1)
+                    }
                   />
                 </PaginationItem>
               </PaginationContent>
@@ -1128,12 +1392,16 @@ export default function ComandasPage() {
       </div>
 
       {/* Alert Dialog para eliminar */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. La comanda será eliminada permanentemente.
+              Esta acción no se puede deshacer. La comanda será eliminada
+              permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
