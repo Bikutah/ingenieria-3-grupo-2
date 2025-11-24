@@ -55,9 +55,12 @@ function ComandaDetalleDialog({
     const [comanda, setComanda] = useState<Comanda | null>(null);
 
     const totalComanda = (det: DetalleComanda[] | undefined) =>
-        (det ?? []).reduce((acc, d) => acc + (Number(d.cantidad || 0) * Number(d.precio_unitario || 0)), 0);
-
-
+        (det ?? []).reduce(
+            (acc, d) =>
+                acc +
+                Number(d.cantidad || 0) * Number(d.precio_unitario || 0),
+            0
+        );
 
     useEffect(() => {
         if (!open || !comandaId) return;
@@ -78,50 +81,79 @@ function ComandaDetalleDialog({
                 if (mounted) setLoading(false);
             }
         })();
-        return () => { mounted = false; };
+        return () => {
+            mounted = false;
+        };
     }, [open, comandaId]);
+
+    // 💡 Cálculos para el resumen (total, seña, restante)
+    const totalProductos = totalComanda(comanda?.detalles_comanda);
+    const montoSenia = Number(factura?.monto_seña ?? 0);
+    const restante = Math.max(totalProductos - montoSenia, 0);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="overflow-hidden rounded-2xl border p-4 sm:max-w-[720px]">
                 <DialogHeader className="px-6 pt-6">
-                    <DialogTitle>Detalle de Comanda {comandaId ? `#${comandaId}` : ""}</DialogTitle>
+                    <DialogTitle>
+                        Detalle de Comanda {comandaId ? `#${comandaId}` : ""}
+                    </DialogTitle>
                     <DialogDescription>Vista de solo lectura</DialogDescription>
                 </DialogHeader>
 
                 <div className="max-h-[70vh] overflow-y-auto p-6 space-y-4">
-                    {loading && <p className="text-sm text-muted-foreground">Cargando…</p>}
-                    {error && <p className="text-sm text-red-600">{error}</p>}
+                    {loading && (
+                        <p className="text-sm text-muted-foreground">
+                            Cargando…
+                        </p>
+                    )}
+                    {error && (
+                        <p className="text-sm text-red-600">{error}</p>
+                    )}
 
                     {!!comanda && (
                         <>
                             {/* Cabecera (labels arriba, valores abajo) */}
                             <div className="grid grid-cols-1 gap-3 text-sm">
                                 <div className="flex flex-col">
-                                    <span className="text-xs text-muted-foreground">Fecha</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Fecha
+                                    </span>
                                     <span>{comanda.fecha}</span>
                                 </div>
 
                                 <div className="flex flex-col">
-                                    <span className="text-xs text-muted-foreground">Mesa</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Mesa
+                                    </span>
                                     <span>#{comanda.id_mesa}</span>
                                 </div>
 
                                 <div className="flex flex-col">
-                                    <span className="text-xs text-muted-foreground">Mozo</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Mozo
+                                    </span>
                                     <span>#{comanda.id_mozo}</span>
                                 </div>
 
                                 <div className="flex flex-col">
-                                    <span className="text-xs text-muted-foreground">Reserva</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Reserva
+                                    </span>
                                     <span>{comanda.id_reserva || "-"}</span>
                                 </div>
 
                                 <div className="flex flex-col">
-                                    <span className="text-xs text-muted-foreground">Estado</span>
-                                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${estadoBadge(comanda.estado)}`}>
-                                            {comanda.estado}
-                                        </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Estado
+                                    </span>
+                                    <span
+                                        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${estadoBadge(
+                                            comanda.estado as EstadoFactura
+                                        )}`}
+                                    >
+                                        {comanda.estado}
+                                    </span>
                                 </div>
                             </div>
 
@@ -131,64 +163,112 @@ function ComandaDetalleDialog({
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Producto</TableHead>
-                                            <TableHead className="text-center">Cant.</TableHead>
-                                            <TableHead className="text-right">P. Unit.</TableHead>
-                                            <TableHead className="text-right">Subtotal</TableHead>
+                                            <TableHead className="text-center">
+                                                Cant.
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                P. Unit.
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Subtotal
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {(comanda.detalles_comanda ?? []).map((d) => (
-                                            <TableRow key={`${d.id}-${d.id_producto}`}>
-                                                <TableCell>#{d.id_producto}</TableCell>
-                                                <TableCell className="text-center">{d.cantidad}</TableCell>
-                                                <TableCell className="text-right">${Number(d.precio_unitario).toFixed(2)}</TableCell>
-                                                <TableCell className="text-right">
-                                                    ${(Number(d.cantidad || 0) * Number(d.precio_unitario || 0)).toFixed(2)}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                        {(comanda.detalles_comanda ?? []).length === 0 && (
-                                            <TableRow>
-                                                <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
-                                                    Sin ítems.
-                                                </TableCell>
-                                            </TableRow>
+                                        {(comanda.detalles_comanda ?? []).map(
+                                            (d) => (
+                                                <TableRow
+                                                    key={`${d.id}-${d.id_producto}`}
+                                                >
+                                                    <TableCell>
+                                                        #{d.id_producto}
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        {d.cantidad}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        $
+                                                        {Number(
+                                                            d.precio_unitario
+                                                        ).toFixed(2)}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        {(
+                                                            Number(
+                                                                d.cantidad ||
+                                                                0
+                                                            ) *
+                                                            Number(
+                                                                d.precio_unitario ||
+                                                                0
+                                                            )
+                                                        ).toFixed(2)}
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
                                         )}
+                                        {(comanda.detalles_comanda ?? [])
+                                            .length === 0 && (
+                                                <TableRow>
+                                                    <TableCell
+                                                        colSpan={4}
+                                                        className="text-center text-muted-foreground py-6"
+                                                    >
+                                                        Sin ítems.
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
                                     </TableBody>
                                 </Table>
                             </div>
 
+                            {/* 🔽 Resumen con el mismo formato que en creación/facturación */}
+                            {(totalProductos > 0 || montoSenia > 0) && (
+                                <div className="mt-4 rounded-md border bg-muted/40 p-3 text-sm space-y-1.5">
+                                    <div className="flex items-center justify-between">
 
+                                        <span>
+                                            Restante a cobrar
+                                        </span>
+                                        <span className="font-semibold">
+                                            $
+                                            {restante.toFixed(2)}
+                                        </span>
+                                    </div>
 
-                            {/* monto_seña */}
+                                    {montoSenia > 0 && (
+                                        <>
+                                            <div className="flex items-center justify-between">
+                                                <span>Seña</span>
+                                                <span className="font-semibold text-amber-700 dark:text-amber-300">
+                                                    -
+                                                    {montoSenia.toFixed(2)}
+                                                </span>
+                                            </div>
+                                            <div className="mt-1 border-t pt-1 flex items-center justify-between">
 
+                                                <span>Total productos</span>
+                                                <span className="font-semibold">
+                                                    $
+                                                    {totalProductos.toFixed(2)}
+                                                </span>
 
-                            { factura != null && 
-                            <div className="flex justify-end text-sm">
-                                <div className="grid grid-cols-2 gap-x-6">
-                                    <span className="text-muted-foreground">Seña</span>
-                                    <span className="text-right font-medium">
-                                        {factura.monto_seña}
-                                    </span>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
-                            </div>
-                            }
-
-                            {/* Total */}
-                            <div className="flex justify-end text-sm">
-                                <div className="grid grid-cols-2 gap-x-6">
-                                    <span className="text-muted-foreground">Total Comanda</span>
-                                    <span className="text-right font-medium">
-                                        ${totalComanda(comanda.detalles_comanda).toFixed(2)}
-                                    </span>
-                                </div>
-                            </div>
+                            )}
                         </>
                     )}
                 </div>
 
                 <DialogFooter className="sticky bottom-0 z-10 bg-background p-6 border-t">
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => onOpenChange(false)}
+                    >
+                        Cerrar
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -199,16 +279,22 @@ function ComandaDetalleDialog({
 type Accion = "pagar" | "cancelar" | "anular";
 
 function ConfirmarAccionFactura({
-    open, onOpenChange, factura, accion, onDone,
+  open, onOpenChange, factura, accion, onDone,
 }: {
-    open: boolean;
-    onOpenChange: (v: boolean) => void;
-    factura: Factura | null;
-    accion: Accion | null;
-    onDone: (updated: Factura) => void;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  factura: Factura | null;
+  accion: Accion | null;
+  onDone: (updated: Factura) => void;
 }) {
-    const [saving, setSaving] = useState(false);
-    if (!factura || !accion) return null;
+  const [saving, setSaving] = useState(false);
+  if (!factura || !accion) return null;
+
+    // 👇 NUEVO: calculamos totales para mostrar en el diálogo
+    const totalFactura = Number(factura.total || 0);
+    const montoSenia = Number((factura as any).monto_seña ?? 0); // si tu tipo ya tiene el campo, sacá el "as any"
+    const totalReal = totalFactura + montoSenia;
+
 
     const run = async () => {
         try {
@@ -231,37 +317,81 @@ function ConfirmarAccionFactura({
 
     return (
         <Dialog open={open} onOpenChange={v => !saving && onOpenChange(v)}>
-            <DialogContent className="overflow-hidden rounded-2xl border p-4 sm:max-w-[560px]">
-                <DialogHeader className="px-6 pt-6">
-                    <DialogTitle className="capitalize">{accion} factura</DialogTitle>
-                    <DialogDescription>Revisá el resumen y confirmá la acción.</DialogDescription>
-                </DialogHeader>
+    <DialogContent className="overflow-hidden rounded-2xl border p-4 sm:max-w-[560px]">
+      <DialogHeader className="px-6 pt-6">
+        <DialogTitle className="capitalize">{accion} factura</DialogTitle>
+        <DialogDescription>
+          Revisá el resumen y confirmá la acción.
+        </DialogDescription>
+      </DialogHeader>
 
-                <div className="max-h-[60vh] overflow-y-auto p-6 space-y-3">
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                        <span className="text-muted-foreground">ID</span>           <span>#{factura.id}</span>
-                        <span className="text-muted-foreground">Comanda</span>      <span>#{factura.id_comanda}</span>
-                        <span className="text-muted-foreground">Medio de pago</span><span className="capitalize">{factura.medio_pago}</span>
-                        <span className="text-muted-foreground">Total</span>        <span>${factura.total}</span>
-                        <span className="text-muted-foreground">Estado</span>       <span className="capitalize">{factura.estado}</span>
-                    </div>
+      <div className="max-h-[60vh] overflow-y-auto p-6 space-y-4">
+        {/* Datos básicos de la factura */}
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <span className="text-muted-foreground">ID</span>
+          <span>#{factura.id}</span>
 
-                    {factura.detalles_factura && (
-                        <pre className="mt-2 rounded-md border bg-muted/30 p-3 text-xs overflow-x-auto">
-                            {factura.detalles_factura}
-                        </pre>
-                    )}
+          <span className="text-muted-foreground">Comanda</span>
+          <span>#{factura.id_comanda}</span>
+
+          <span className="text-muted-foreground">Medio de pago</span>
+          <span className="capitalize">{factura.medio_pago}</span>
+
+          <span className="text-muted-foreground">Estado</span>
+          <span className="capitalize">{factura.estado}</span>
+
+          {/* Total de ESTA factura (lo que estás por cobrar ahora) */}
+          <span className="text-muted-foreground">Total factura</span>
+          <span>${totalFactura.toFixed(2)}</span>
+        </div>
+
+        {/* 🔽 Resumen del total real: seña + factura */}
+        {(montoSenia > 0 || totalFactura > 0) && (
+          <div className="mt-2 rounded-md border bg-muted/40 p-3 text-sm space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span>Total real (seña + factura)</span>
+              <span className="font-semibold">
+                ${totalReal.toFixed(2)}
+              </span>
+            </div>
+
+            {montoSenia > 0 && (
+              <>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Seña aplicada</span>
+                  <span>${montoSenia.toFixed(2)}</span>
                 </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Factura actual</span>
+                  <span>${totalFactura.toFixed(2)}</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
-                <DialogFooter className="sticky bottom-0 z-10 bg-background p-6 border-t">
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-                        Cancelar
-                    </Button>
-                    <Button className="capitalize" onClick={run} disabled={saving}>
-                        Confirmar {accion}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
+        {/* Detalle crudo si lo necesitás para debug u otro uso */}
+        {factura.detalles_factura && (
+          <pre className="mt-2 rounded-md border bg-muted/30 p-3 text-xs overflow-x-auto">
+            {factura.detalles_factura}
+          </pre>
+        )}
+      </div>
+
+      <DialogFooter className="sticky bottom-0 z-10 bg-background p-6 border-t">
+        <Button
+          variant="outline"
+          onClick={() => onOpenChange(false)}
+          disabled={saving}
+        >
+          Cancelar
+        </Button>
+        <Button className="capitalize" onClick={run} disabled={saving}>
+          Confirmar {accion}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+
         </Dialog>
     );
 }
@@ -304,11 +434,12 @@ export default function FacturasPage() {
     const [comandaOpen, setComandaOpen] = useState(false);
     const [comandaId, setComandaId] = useState<number | null>(null);
 
-    const openComanda = (id: number) => {
-        setComandaId(id);
+    const openComanda = (factura: Factura) => {
+        if (!factura.id_comanda) return;
+        setSelected(factura);            // 👈 acá seteamos la factura
+        setComandaId(factura.id_comanda);
         setComandaOpen(true);
     };
-
 
     // paginación (server-side)
     const [page, setPage] = useState(1);
@@ -595,7 +726,7 @@ export default function FacturasPage() {
                                         {f.id_comanda ? (
                                             <Button
                                                 size="sm" className="capitalize"
-                                                onClick={() => openComanda(f.id_comanda)}
+                                                onClick={() => openComanda(f)}
                                             ><Info className="mr-1 h-4 w-4" />
                                                 #{f.id_comanda}
                                             </Button>
@@ -603,7 +734,30 @@ export default function FacturasPage() {
                                     </TableCell>
 
                                     <TableCell className="capitalize">{f.medio_pago}</TableCell>
-                                    <TableCell>${f.total}</TableCell>
+                                    <TableCell>
+                                        {(() => {
+                                            const totalFactura = Number(f.total || 0);
+                                            const senia = Number((f as any).monto_seña ?? 0); // si el tipo ya la tiene, sacá el `as any`
+                                            const totalReal = totalFactura + senia;
+
+                                            return (
+                                                <div className="flex flex-col text-sm">
+                                                    {/* Total real (seña + factura) */}
+                                                    <span className="font-semibold">
+                                                        ${totalReal.toFixed(2)}
+                                                    </span>
+
+                                                    {/* Línea aclaratoria si hay seña */}
+                                                    {senia > 0 && (
+                                                        <span className="text-[11px] text-muted-foreground">
+                                                            (Seña: ${senia.toFixed(2)} + Factura: ${totalFactura.toFixed(2)})
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+                                    </TableCell>
+
                                     <TableCell>
                                         <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${estadoBadge(f.estado)}`}>
                                             {f.estado}

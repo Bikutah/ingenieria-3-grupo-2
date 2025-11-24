@@ -391,29 +391,47 @@ export default function ComandasPage() {
       detalles_comanda: [],
     })
 
-    if (comanda) {
-      setSelectedComanda(comanda)
-      setLoading(true)
+if (comanda) {
+  setSelectedComanda(comanda)
+  setLoading(true)
+  try {
+    const fullComanda = await comandasService.getById(comanda.id)
+
+    // setear datos de la comanda
+    setFormData({
+      fecha: fullComanda.fecha,
+      id_mesa: fullComanda.id_mesa,
+      id_mozo: fullComanda.id_mozo,
+      id_reserva: fullComanda.id_reserva,
+      estado: fullComanda.estado,
+      detalles_comanda: fullComanda.detalles_comanda ?? [],
+    })
+
+    // 👇 NUEVO: si la comanda tiene reserva, la cargamos por id
+    if (fullComanda.id_reserva && fullComanda.id_reserva > 0) {
       try {
-        const fullComanda = await comandasService.getById(comanda.id)
-        setFormData({
-          fecha: fullComanda.fecha,
-          id_mesa: fullComanda.id_mesa,
-          id_mozo: fullComanda.id_mozo,
-          id_reserva: fullComanda.id_reserva,
-          estado: fullComanda.estado,
-          detalles_comanda: fullComanda.detalles_comanda ?? [],
+        const res = await reservasService.list({
+          id: fullComanda.id_reserva,
+          page: 1,
+          size: 1,
         })
-      } catch (e) {
-        console.error("Error cargando detalles de comanda:", e)
-        toast.error("No se pudieron cargar los detalles para edición.", {
-          description: extractApiErrorMessage(e),
-        })
-        setIsDialogOpen(false)
-      } finally {
-        setLoading(false)
+        setReservas(res.items ?? [])
+      } catch (err) {
+        console.error("Error cargando reserva asociada:", err)
+        // opcional: mostrar un toast, pero no rompemos el flujo
       }
     }
+  } catch (e) {
+    console.error("Error cargando detalles de comanda:", e)
+    toast.error("No se pudieron cargar los detalles para edición.", {
+      description: extractApiErrorMessage(e),
+    })
+    setIsDialogOpen(false)
+  } finally {
+    setLoading(false)
+  }
+}
+
   }
 
   const handleSave = async () => {
@@ -585,11 +603,6 @@ export default function ComandasPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="max-h-[60vh] overflow-y-auto p-6 space-y-6">
-
-
-
-
-
 
 {/* Mozo */}
               <div className="grid gap-1.5">
