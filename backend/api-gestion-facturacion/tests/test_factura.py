@@ -175,7 +175,9 @@ def test_filtrar_facturas_por_estado(mock_obtener_datos, mock_marcar_facturada, 
     factura_id = response1.json()["id"]
 
     # Cambiar una factura a pagada
-    client.put(f"/factura/{factura_id}/pagar")
+    with patch('src.factura.httpClient.ComandaClient.marcar_comanda_pagada') as mock_marcar_pagada:
+        mock_marcar_pagada.return_value = None
+        client.put(f"/factura/{factura_id}/pagar")
 
     # Mock para segunda factura
     mock_obtener_datos.return_value = {
