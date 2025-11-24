@@ -63,7 +63,7 @@ def test_crear_comanda_exitoso(client):
         "id_mozo": 1,
         "id_reserva": None,
         "fecha": str(date.today()),
-        "baja": False,
+        "estado": "pendiente",
         "detalles_comanda": [
             {
                 "id_producto": 10,
@@ -84,7 +84,7 @@ def test_crear_comanda_exitoso(client):
     data = response.json()
     assert data["id_mesa"] == comanda_data["id_mesa"]
     assert data["id_mozo"] == comanda_data["id_mozo"]
-    assert data["baja"] == False
+    assert data["estado"] == "pendiente"
     assert "id" in data
     assert len(data["detalles_comanda"]) == 2
     assert data["detalles_comanda"][0]["precio_unitario"] == 150.50
@@ -281,11 +281,11 @@ def test_eliminar_comanda_soft_delete(client):
     response_delete = client.delete(f"/comanda/{comanda_id}")
     assert response_delete.status_code == 204
 
-    # Verificar que todavía existe pero con baja=True
+    # Verificar que todavía existe pero con estado=anulada
     response_get = client.get(f"/comanda/{comanda_id}")
     assert response_get.status_code == 200
     data = response_get.json()
-    assert data["baja"] == True
+    assert data["estado"] == "anulada"
 
 def test_modificar_comanda(client):
     """
