@@ -563,10 +563,14 @@ export default function ReservasPage() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} >
           <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Reserva
-            </Button>
+<Button
+  data-cy="btn-nueva-reserva"
+  onClick={() => handleOpenDialog()}
+>
+  <Plus className="mr-2 h-4 w-4" />
+  Nueva Reserva
+</Button>
+
           </DialogTrigger>
             <DialogContent
     className="overflow-hidden rounded-2xl border p-4 sm:max-w-[600px]" // <- el borde vive acá
@@ -584,6 +588,7 @@ export default function ReservasPage() {
                 <Label htmlFor="fecha">Fecha</Label>
                 <Input
                   id="fecha"
+                  data-cy="input-fecha"
                   type="date"
                   value={formData.fecha}
                   onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
@@ -602,6 +607,7 @@ export default function ReservasPage() {
                 <Label htmlFor="horario">Horario</Label>
                 <Input
                   id="horario"
+                  data-cy="input-horario"
                   value={formData.horario}
                   onChange={(e) => setFormData({ ...formData, horario: e.target.value })}
                   onBlur={() => markTouched("horario")}
@@ -619,6 +625,7 @@ export default function ReservasPage() {
                 <Label htmlFor="cantidad_personas">Cantidad de personas</Label>
                 <Input
                   id="cantidad_personas"
+                  data-cy="input-cantidad_personas"
                   type="number"
                   min={1}
                   value={formData.cantidad_personas}
@@ -734,6 +741,7 @@ export default function ReservasPage() {
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
+                      data-cy="combo-mesa-trigger"
                       variant={showError("id_mesa") ? "destructive" : "outline"}
                       role="combobox"
                       className="w-full justify-between"
@@ -803,6 +811,7 @@ export default function ReservasPage() {
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
+                      data-cy="combo-cliente-trigger"
                       variant={showError("id_cliente") ? "destructive" : "outline"}
                       role="combobox"
                       className="w-full justify-between"
@@ -1097,7 +1106,7 @@ export default function ReservasPage() {
               <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
                 Cancelar
               </Button>
-              <Button onClick={handleSave} disabled={saving || !isFormValid}>
+              <Button data-cy="btn-submit-reserva" onClick={handleSave} disabled={saving || !isFormValid}>
                 {selectedReserva ? "Guardar Cambios" : "Crear Reserva"}
               </Button>
             </DialogFooter>
