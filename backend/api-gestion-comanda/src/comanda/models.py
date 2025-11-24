@@ -22,7 +22,11 @@ class Comanda(Base):
     created_at = Column(DateTime, server_default=func.now(), index=True)
     
     # Relación con detalles
-    detalles_comanda = relationship("DetalleComanda", back_populates="comanda")
+    detalles_comanda = relationship(
+    "DetalleComanda",
+    back_populates="comanda",
+    cascade="all, delete-orphan"
+)
 
 ##Detalle Comanda
 

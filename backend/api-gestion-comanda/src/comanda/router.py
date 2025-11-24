@@ -50,10 +50,29 @@ def modify(id_: int, payload: schemas.ComandaCreate, db: Session = Depends(get_d
     if obj is None:
         raise HTTPException(status_code=404, detail="Comanda no encontrado")
     
-    # Excluir detalles_comanda del update (solo se modifican campos de la comanda principal)
-    update_data = payload.model_dump(exclude_unset=True, exclude={"detalles_comanda"})
+    # 1) Actualizar solo campos de la comanda principal
+    update_data = payload.model_dump(
+        exclude_unset=True,
+        exclude={"detalles_comanda"}
+    )
     for key, value in update_data.items():
         setattr(obj, key, value)
+
+    # 2) Actualizar detalles si vinieron en el payload
+    #    (reemplazo total de la lista)
+    if "detalles_comanda" in payload.model_fields_set:
+        # Vaciar detalles actuales
+        obj.detalles_comanda.clear()
+
+        # Crear nuevos detalles desde el schema
+        for det_schema in payload.detalles_comanda:
+            det_data = det_schema.model_dump(exclude_unset=True)
+            nuevo_detalle = models.DetalleComanda(
+                id_comanda=obj.id,  # FK
+                **det_data
+            )
+            obj.detalles_comanda.append(nuevo_detalle)
+
     db.commit()
     db.refresh(obj)
     return obj
