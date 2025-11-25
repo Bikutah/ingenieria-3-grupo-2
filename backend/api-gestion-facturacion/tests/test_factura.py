@@ -301,8 +301,9 @@ def test_marcar_factura_como_anulada(mock_obtener_datos, client):
         factura_id = response_creacion.json()["id"]
 
     # Marcar como anulada
-    with patch('src.factura.httpClient.ComandaClient.marcar_comanda_pendiente') as mock_marcar_pendiente:
-        mock_marcar_pendiente.return_value = None
+    with patch('src.factura.httpClient.ComandaClient.marcar_comanda_anulada') as mock_marcar_anulada:
+        mock_marcar_anulada.return_value = None
+        response = client.put(f"/factura/{factura_id}/anular")
         assert response.status_code == 200
         data = response.json()
         assert data["estado"] == "anulada"
