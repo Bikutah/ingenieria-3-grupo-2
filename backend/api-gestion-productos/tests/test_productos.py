@@ -171,3 +171,72 @@ def test_modificar_producto(client):
     # Verificar que el cambio persiste
     response_get = client.get(f"/productos/{producto_id}")
     assert response_get.json()["precio"] == 25.5
+
+def test_eliminar_producto(client):
+    """
+    Test para verificar la eliminación lógica de un producto.
+    """
+    # Crear carta y producto
+    client.post("/carta/", json={"nombre": "Carta Test"})
+    response_creacion = client.post("/productos/", json={"nombre": "Producto Test", "tipo": "plato", "precio": 10, "id_carta": 1})
+    producto_id = response_creacion.json()["id"]
+
+    # Eliminar producto (baja lógica)
+    response_delete = client.delete(f"/productos/{producto_id}")
+    assert response_delete.status_code == 204
+
+    # Verificar que está dado de baja
+    response_get = client.get(f"/productos/{producto_id}")
+    assert response_get.json()["baja"] == True
+
+def test_reutilizar_nombre_producto_despues_baja(client):
+    """
+    Test para verificar que se puede reutilizar el nombre de un producto eliminado lógicamente.
+    """
+    # Crear carta y producto
+    client.post("/carta/", json={"nombre": "Carta Test"})
+    client.post("/productos/", json={"nombre": "Producto Original", "tipo": "plato", "precio": 10, "id_carta": 1})
+
+    # Eliminar producto (baja lógica)
+    response_delete = client.delete("/productos/1")
+    assert response_delete.status_code == 204
+
+    # Crear nuevo producto con el mismo nombre debería funcionar
+    response_nuevo = client.post("/productos/", json={"nombre": "Producto Original", "tipo": "bebida", "precio": 15, "id_carta": 1})
+    assert response_nuevo.status_code == 201
+    data = response_nuevo.json()
+    assert data["nombre"] == "Producto Original"
+    assert data["tipo"] == "bebida"
+
+def test_eliminar_carta(client):
+    """
+    Test para verificar la eliminación lógica de una carta.
+    """
+    # Crear carta sin productos
+    response_creacion = client.post("/carta/", json={"nombre": "Carta Test"})
+    carta_id = response_creacion.json()["id"]
+
+    # Eliminar carta (baja lógica)
+    response_delete = client.delete(f"/carta/{carta_id}")
+    assert response_delete.status_code == 204
+
+    # Verificar que está dada de baja
+    response_get = client.get(f"/carta/{carta_id}")
+    assert response_get.json()["baja"] == True
+
+def test_reutilizar_nombre_carta_despues_baja(client):
+    """
+    Test para verificar que se puede reutilizar el nombre de una carta eliminada lógicamente.
+    """
+    # Crear carta
+    client.post("/carta/", json={"nombre": "Carta Original"})
+
+    # Eliminar carta (baja lógica)
+    response_delete = client.delete("/carta/1")
+    assert response_delete.status_code == 204
+
+    # Crear nueva carta con el mismo nombre debería funcionar
+    response_nueva = client.post("/carta/", json={"nombre": "Carta Original"})
+    assert response_nueva.status_code == 201
+    data = response_nueva.json()
+    assert data["nombre"] == "Carta Original"

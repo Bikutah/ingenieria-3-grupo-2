@@ -12,7 +12,7 @@ class ProductosFilter(Filter):
     created_at__gte: str | None = None
     id_carta: int | None = None # Nuevo filtro por ID de carta
     created_at__lte: str | None = None
-    baja: bool | None = None
+    baja: bool = False  # Por defecto excluir productos dados de baja
 
     # Permite ordenar por cualquier campo, ej: ?order_by=-precio&order_by=nombre
     order_by: list[str] | None = None
