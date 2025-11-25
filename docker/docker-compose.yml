@@ -85,3 +85,14 @@ services:
     restart: always
     env_file:
       - ../backend/api-gestion-facturacion/.env
+  reporte:
+    build:
+      context: ../backend/api-reporte
+      dockerfile: Dockerfile
+    ports:
+      - "8007:8000"
+    volumes:
+      - ../backend/api-reporte:/app
+    restart: always
+    env_file:
+      - ../backend/api-reporte/.env
