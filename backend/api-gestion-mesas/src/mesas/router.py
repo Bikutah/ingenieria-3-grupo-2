@@ -12,6 +12,12 @@ from fastapi_filter import FilterDepends
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlalchemy import paginate
 
+import httpx
+
+# URLs de otros microservicios
+RESERVAS_API_URL = "http://gestion-reservas:8000"
+COMANDAS_API_URL = "http://gestion-comanda:8000"
+
 router = APIRouter()
 
 @router.post("/", response_model=schemas.MesasOut)
@@ -24,10 +30,11 @@ def create(payload: schemas.MesasCreate, db: Session = Depends(get_db)):
             detail="Sector no encontrado"
         )
     
-    # Verificar número único en el mismo sector
+    # Verificar número único en el mismo sector solo para mesas activas
     existe = db.query(models.Mesas).filter(
         models.Mesas.numero == payload.numero,
-        models.Mesas.id_sector == payload.id_sector
+        models.Mesas.id_sector == payload.id_sector,
+        models.Mesas.baja == False
     ).first()
     if existe:
         raise HTTPException(
@@ -66,13 +73,14 @@ def modify(mesa_id: int, payload: schemas.MesasModify, db: Session = Depends(get
                 detail="Sector no encontrado"
             )
 
-    # Validar número único si se modifica
+    # Validar número único si se modifica solo para mesas activas
     if "numero" in data and data["numero"] is not None:
         sector_id = data.get("id_sector", mesa.id_sector)
         existe = db.query(models.Mesas).filter(
             models.Mesas.numero == data["numero"],
             models.Mesas.id_sector == sector_id,
-            models.Mesas.id != mesa_id
+            models.Mesas.id != mesa_id,
+            models.Mesas.baja == False
         ).first()
         if existe:
             raise HTTPException(
@@ -100,7 +108,7 @@ def list_all(
     filtro: MesasFilter = FilterDepends(MesasFilter),
     db: Session = Depends(get_db),
 ):
-    query = filtro.filter(select(models.Mesas))
+    query = filtro.filter(select(models.Mesas).where(models.Mesas.baja == False))
     query = filtro.sort(query)
     return paginate(db, query)
 
@@ -113,3 +121,59 @@ def get_one(id_: int, db: Session = Depends(get_db)):
             detail="Mesa no encontrada"
         )
     return obj
+
+@router.delete("/{id_}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete(id_: int, db: Session = Depends(get_db)):
+    obj = db.get(models.Mesas, id_)
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Mesa no encontrada")
+
+    # Verificar si la mesa está en reservas activas
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{RESERVAS_API_URL}/reserva/?id_mesa={id_}&baja=false")
+            response.raise_for_status()
+            reservas_data = response.json()
+    except Exception:
+        # Si hay cualquier error (conexión, parsing, etc.), asumir que no hay reservas activas
+        reservas_data = {"total": 0}
+
+    if reservas_data.get("total", 0) > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="No se puede eliminar la mesa porque tiene reservas activas"
+        )
+
+    # Verificar si la mesa está en comandas pendientes
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{COMANDAS_API_URL}/comanda/?id_mesa={id_}&estado=pendiente")
+            response.raise_for_status()
+            comandas_data = response.json()
+    except Exception:
+        comandas_data = {"total": 0}
+
+    if comandas_data.get("total", 0) > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="No se puede eliminar la mesa porque tiene comandas pendientes"
+        )
+
+    # Verificar si la mesa está en comandas facturadas
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{COMANDAS_API_URL}/comanda/?id_mesa={id_}&estado=facturada")
+            response.raise_for_status()
+            comandas_data = response.json()
+    except Exception:
+        comandas_data = {"total": 0}
+
+    if comandas_data.get("total", 0) > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="No se puede eliminar la mesa porque tiene comandas facturadas"
+        )
+
+    obj.baja = True
+    db.commit()
+    return None

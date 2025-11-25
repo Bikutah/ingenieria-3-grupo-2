@@ -5,7 +5,9 @@ class ComandaFilter(Filter):
     # ejemplos típicos (extensible según tu modelo):
     id : int | None = None              # ?id=1
     id__neq: int | None = None              # ?id__neq=1
-    nombre__ilike: str | None = None       # ?nombre__ilike=juan
+    id_mesa: int | None = None          # ?id_mesa=1
+    estado: str | None = None           # ?estado=pendiente
+    estado__in: str | None = None       # ?estado__in=pendiente,facturada
     created_at__gte: str | None = None     # ?created_at__gte=2025-01-01
     created_at__lte: str | None = None     # ?created_at__lte=2025-12-31
 
