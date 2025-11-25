@@ -6,10 +6,10 @@ class MozoFilter(Filter):
     id: int | None = None                    # ?id=1
     id__neq: int | None = None              # ?id__eq=1
     nombre__ilike: str | None = None       # ?nombre__ilike=juan
-    apellido__ilike: str | None = None 
-    dni__ilike: str | None = None 
-    direccion__ilike: str | None = None 
-    baja: bool | None = None                # ?baja=true
+    apellido__ilike: str | None = None
+    dni__ilike: str | None = None
+    direccion__ilike: str | None = None
+    baja: bool = False                      # Por defecto excluir bajas lógicas
 
     # orden: ?order_by=-created_at&order_by=nombre
     order_by: list[str] | None = None

@@ -1,5 +1,19 @@
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import patch, Mock, AsyncMock
+
+def mock_httpx_client():
+    """Helper para mockear httpx.AsyncClient con respuesta exitosa"""
+    mock_response = Mock()
+    mock_response.json.return_value = {"total": 0}
+    mock_response.raise_for_status.return_value = None
+
+    mock_client_instance = AsyncMock()
+    mock_client_instance.get = AsyncMock(return_value=mock_response)
+    mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+    mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+
+    return mock_client_instance
 
 # --- Solución al problema de importación ---
 import sys
@@ -289,6 +303,63 @@ def test_obtener_mozo_inexistente(client):
     response = client.get("/mozo/999")
     assert response.status_code == 404
 
+@patch('httpx.AsyncClient')
+def test_eliminar_mozo(mock_client_class, client):
+    """
+    Test para verificar la eliminación lógica de un mozo.
+    """
+    mock_client_class.return_value = mock_httpx_client()
+
+    # Crear mozo
+    response_creacion = client.post("/mozo/", json={
+        "nombre": "Juan",
+        "apellido": "Pérez",
+        "dni": "12345678",
+        "direccion": "Calle 1",
+        "telefono": "111111111"
+    })
+    mozo_id = response_creacion.json()["id"]
+
+    # Eliminar mozo (baja lógica)
+    response_delete = client.delete(f"/mozo/{mozo_id}")
+    assert response_delete.status_code == 204
+
+    # Verificar que está dado de baja
+    response_get = client.get(f"/mozo/{mozo_id}")
+    assert response_get.json()["baja"] == True
+
+@patch('httpx.AsyncClient')
+def test_crear_mozo_con_dni_duplicado_despues_de_baja(mock_client_class, client):
+    """
+    Test para verificar que se puede crear un mozo con DNI duplicado si el original está dado de baja.
+    """
+    mock_client_class.return_value = mock_httpx_client()
+
+    # Crear mozo inicial
+    client.post("/mozo/", json={
+        "nombre": "Juan",
+        "apellido": "Pérez",
+        "dni": "12345678",
+        "direccion": "Calle 1",
+        "telefono": "111111111"
+    })
+
+    # Dar de baja al mozo
+    response_list = client.get("/mozo/?baja=false")
+    mozo_id = response_list.json()["items"][0]["id"]
+    client.delete(f"/mozo/{mozo_id}")
+
+    # Ahora debería permitir crear otro mozo con el mismo DNI
+    response = client.post("/mozo/", json={
+        "nombre": "María",
+        "apellido": "García",
+        "dni": "12345678",  # Mismo DNI
+        "direccion": "Calle 2",
+        "telefono": "222222222"
+    })
+    assert response.status_code == 200
+
+
 # --- Tests para el endpoint de Clientes ---
 
 def test_crear_cliente_exitoso(client):
@@ -508,3 +579,56 @@ def test_obtener_cliente_inexistente(client):
     """
     response = client.get("/cliente/999")
     assert response.status_code == 404
+
+@patch('httpx.AsyncClient')
+def test_eliminar_cliente(mock_client_class, client):
+    """
+    Test para verificar la eliminación lógica de un cliente.
+    """
+    mock_client_class.return_value = mock_httpx_client()
+
+    # Crear cliente
+    response_creacion = client.post("/cliente/", json={
+        "nombre": "Carlos",
+        "apellido": "Rodríguez",
+        "dni": "11223344",
+        "telefono": "333333333"
+    })
+    cliente_id = response_creacion.json()["id"]
+
+    # Eliminar cliente (baja lógica)
+    response_delete = client.delete(f"/cliente/{cliente_id}")
+    assert response_delete.status_code == 204
+
+    # Verificar que está dado de baja
+    response_get = client.get(f"/cliente/{cliente_id}")
+    assert response_get.json()["baja"] == True
+
+@patch('httpx.AsyncClient')
+def test_crear_cliente_con_dni_duplicado_despues_de_baja(mock_client_class, client):
+    """
+    Test para verificar que se puede crear un cliente con DNI duplicado si el original está dado de baja.
+    """
+    mock_client_class.return_value = mock_httpx_client()
+
+    # Crear cliente inicial
+    client.post("/cliente/", json={
+        "nombre": "Carlos",
+        "apellido": "Rodríguez",
+        "dni": "11223344",
+        "telefono": "333333333"
+    })
+
+    # Dar de baja al cliente
+    response_list = client.get("/cliente/?baja=false")
+    cliente_id = response_list.json()["items"][0]["id"]
+    client.delete(f"/cliente/{cliente_id}")
+
+    # Ahora debería permitir crear otro cliente con el mismo DNI
+    response = client.post("/cliente/", json={
+        "nombre": "Ana",
+        "apellido": "Martínez",
+        "dni": "11223344",  # Mismo DNI
+        "telefono": "444444444"
+    })
+    assert response.status_code == 200
