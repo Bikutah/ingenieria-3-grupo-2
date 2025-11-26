@@ -260,6 +260,7 @@ export default function SectoresPage() {
       setSectorToDelete(null)
     } catch (e) {
       console.error("Error eliminando sector:", e)
+      toast.error("No se pudo eliminar el sector", { description: extractApiErrorMessage(e) })
     }
   }
 

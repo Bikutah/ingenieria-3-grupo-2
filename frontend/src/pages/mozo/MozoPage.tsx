@@ -269,6 +269,7 @@ export default function MozosPage() {
       setMozoToDelete(null)
     } catch (e) {
       console.error("Error eliminando mozo:", e)
+      toast.error("No se pudo eliminar el mozo", { description: extractApiErrorMessage(e) })
     }
   }
 
