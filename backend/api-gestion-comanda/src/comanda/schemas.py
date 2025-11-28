@@ -1,6 +1,16 @@
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import date
 from typing import List
+from enum import Enum
+
+
+class EstadoComanda(str, Enum):
+    pendiente = "pendiente"
+    pagada = "pagada"
+    cancelada = "cancelada"
+    anulada = "anulada"
+    facturada = "facturada"
+
 
 #Schema para Detalle Comanda
 class DetalleComandaBase(BaseModel):
@@ -19,9 +29,9 @@ class DetalleComandaOut(DetalleComandaBase):
 class ComandaBase(BaseModel):
     id_mesa: int = Field(..., gt=0)
     id_mozo: int = Field(..., gt=0)
-    id_reserva: int | None = Field(None, gt=0)
+    id_reserva: int | None = None
     fecha: date
-    baja: bool = False
+    estado: EstadoComanda = EstadoComanda.pendiente
 
 class ComandaCreate(ComandaBase):
     detalles_comanda: List[DetalleComandaCreate] = Field(..., min_length=1)

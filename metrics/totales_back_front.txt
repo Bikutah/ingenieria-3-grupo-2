@@ -1,0 +1,48 @@
+== RESUMEN DE TOTALES BACKEND / FRONTEND ==
+
+BACKEND:
+  LOC: 5917
+  LLOC: 3750
+  SLOC: 4136
+  Comments: 673
+  Single comments: 533
+  Multi: 317
+  Blank: 931
+
+FRONTEND:
+  Physical: 12140
+  Source: 10894
+  Comment: 375
+  Empty: 1035
+  To Do: 0
+
+COMBINADO:
+  Total líneas (back LOC + front Physical): 18057
+  Líneas de código (back SLOC + front Source): 15030
+  Comentarios (back Comments + front Comment): 1048
+  Líneas en blanco (back Blank + front Empty): 1966
+
+
+== EXPLICACIÓN DE CADA MÉTRICA ==
+
+--- BACKEND (radon) ---
+LOC: Total de líneas físicas del backend (incluye código, comentarios y vacías).
+LLOC: Líneas lógicas de código (cuenta instrucciones reales, no líneas físicas).
+SLOC: Líneas de código ejecutable (sin comentarios ni líneas vacías).
+Comments: Total de líneas que contienen comentarios.
+Blank: Líneas totalmente vacías.
+Single comments: Comentarios de una sola línea (# comentario).
+Multi: Comentarios multilínea o docstrings.
+
+--- FRONTEND (sloc) ---
+Physical: Total de líneas físicas (incluye código, comentarios, vacías).
+Source: Líneas reales de código JS/TS/React.
+Comment: Líneas que contienen comentarios (// o /* */).
+Empty: Líneas vacías.
+To Do: Comentarios marcados como TODO.
+
+--- COMBINADO ---
+Total líneas: Tamaño total del proyecto (backend + frontend).
+Líneas de código: Código ejecutable real del proyecto.
+Comentarios: Documentación interna escrita por el equipo.
+Líneas en blanco: Miden estilo, formateo y legibilidad del proyecto.

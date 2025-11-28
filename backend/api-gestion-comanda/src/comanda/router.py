@@ -23,7 +23,7 @@ def create(payload: schemas.ComandaCreate, db: Session = Depends(get_db)):
         id_mozo=payload.id_mozo,
         id_reserva=payload.id_reserva,
         fecha=payload.fecha,
-        baja=payload.baja
+        estado=models.EstadoComanda.pendiente
     )
     db.add(db_comanda)
     db.flush()
@@ -50,10 +50,29 @@ def modify(id_: int, payload: schemas.ComandaCreate, db: Session = Depends(get_d
     if obj is None:
         raise HTTPException(status_code=404, detail="Comanda no encontrado")
     
-    # Excluir detalles_comanda del update (solo se modifican campos de la comanda principal)
-    update_data = payload.model_dump(exclude_unset=True, exclude={"detalles_comanda"})
+    # 1) Actualizar solo campos de la comanda principal
+    update_data = payload.model_dump(
+        exclude_unset=True,
+        exclude={"detalles_comanda"}
+    )
     for key, value in update_data.items():
         setattr(obj, key, value)
+
+    # 2) Actualizar detalles si vinieron en el payload
+    #    (reemplazo total de la lista)
+    if "detalles_comanda" in payload.model_fields_set:
+        # Vaciar detalles actuales
+        obj.detalles_comanda.clear()
+
+        # Crear nuevos detalles desde el schema
+        for det_schema in payload.detalles_comanda:
+            det_data = det_schema.model_dump(exclude_unset=True)
+            nuevo_detalle = models.DetalleComanda(
+                id_comanda=obj.id,  # FK
+                **det_data
+            )
+            obj.detalles_comanda.append(nuevo_detalle)
+
     db.commit()
     db.refresh(obj)
     return obj
@@ -79,7 +98,47 @@ def delete(id_: int, db: Session = Depends(get_db)):
     obj = db.get(models.Comanda, id_)
     if obj is None:
         raise HTTPException(status_code=404, detail="Comanda no encontrado")
-    obj.baja = True
+    obj.estado = models.EstadoComanda.anulada
+    db.add(obj)
+    db.commit()
+    return
+
+@router.put("/{id_}/facturar", status_code=status.HTTP_204_NO_CONTENT)
+def facturar(id_: int, db: Session = Depends(get_db)):
+    obj = db.get(models.Comanda, id_)
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Comanda no encontrado")
+    obj.estado = models.EstadoComanda.facturada
+    db.add(obj)
+    db.commit()
+    return
+
+@router.put("/{id_}/pendiente", status_code=status.HTTP_204_NO_CONTENT)
+def pendiente(id_: int, db: Session = Depends(get_db)):
+    obj = db.get(models.Comanda, id_)
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Comanda no encontrado")
+    obj.estado = models.EstadoComanda.pendiente
+    db.add(obj)
+    db.commit()
+    return
+
+@router.put("/{id_}/pagada", status_code=status.HTTP_204_NO_CONTENT)
+def pagada(id_: int, db: Session = Depends(get_db)):
+    obj = db.get(models.Comanda, id_)
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Comanda no encontrado")
+    obj.estado = models.EstadoComanda.pagada
+    db.add(obj)
+    db.commit()
+    return
+
+@router.put("/{id_}/anulada", status_code=status.HTTP_204_NO_CONTENT)
+def anulada(id_: int, db: Session = Depends(get_db)):
+    obj = db.get(models.Comanda, id_)
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Comanda no encontrado")
+    obj.estado = models.EstadoComanda.anulada
     db.add(obj)
     db.commit()
     return
@@ -87,8 +146,6 @@ def delete(id_: int, db: Session = Depends(get_db)):
 @router.get("/{id_comanda}/detalles", response_model=Page[schemas.DetalleComandaOut])
 def get_detalles(id_comanda: int, db: Session = Depends(get_db)):
     query = select(models.DetalleComanda).where(models.DetalleComanda.id_comanda == id_comanda)
-    if query is None:
-        raise HTTPException(status_code=404, detail="Detalles de comanda no encontrados")
     return paginate(db, query)
 
 #Modificacion Detalles de Comanda

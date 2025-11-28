@@ -67,4 +67,5 @@ class ClienteModify(BaseModel):
 
 class ClienteOut(ClienteBase):
     id: int
+    baja: bool
     model_config = ConfigDict(from_attributes=True) # Permite que Pydantic lea desde objetos ORM

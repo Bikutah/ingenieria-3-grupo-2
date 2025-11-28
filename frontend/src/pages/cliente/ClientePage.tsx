@@ -43,6 +43,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Plus, Pencil, Trash2 } from "lucide-react"
+import { toast } from "sonner"
+import { extractApiErrorMessage } from "@/lib/api-error"
 
 import type { Cliente as DomainCliente } from "@/services/cliente/types/Cliente"
 import { clienteService } from "@/services/cliente/api/ClienteService"
@@ -188,6 +190,7 @@ export default function ClientePage() {
       setClienteToDelete(null)
     } catch (e) {
       console.error("Error eliminando cliente:", e)
+      toast.error("No se pudo eliminar el cliente", { description: extractApiErrorMessage(e) })
     }
   }
 

@@ -561,27 +561,34 @@ export default function ReservasPage() {
             {loading ? "Cargando..." : "Administra el personal de tu restaurante"}
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} >
           <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Reserva
-            </Button>
+<Button
+  data-cy="btn-nueva-reserva"
+  onClick={() => handleOpenDialog()}
+>
+  <Plus className="mr-2 h-4 w-4" />
+  Nueva Reserva
+</Button>
+
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
+            <DialogContent
+    className="overflow-hidden rounded-2xl border p-4 sm:max-w-[600px]" // <- el borde vive acá
+  >
+            <DialogHeader className="px-6 pt-6">
               <DialogTitle>{selectedReserva ? "Modificar Reserva" : "Nuevo Reserva"}</DialogTitle>
               <DialogDescription>
                 {selectedReserva ? "Modifica los datos del reserva" : "Completa los datos del nueva reserva"}
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="max-h-[60vh] overflow-y-auto p-6 space-y-6">
 
               {/* Fecha */}
               <div className="grid gap-1.5">
                 <Label htmlFor="fecha">Fecha</Label>
                 <Input
                   id="fecha"
+                  data-cy="input-fecha"
                   type="date"
                   value={formData.fecha}
                   onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
@@ -600,6 +607,7 @@ export default function ReservasPage() {
                 <Label htmlFor="horario">Horario</Label>
                 <Input
                   id="horario"
+                  data-cy="input-horario"
                   value={formData.horario}
                   onChange={(e) => setFormData({ ...formData, horario: e.target.value })}
                   onBlur={() => markTouched("horario")}
@@ -617,6 +625,7 @@ export default function ReservasPage() {
                 <Label htmlFor="cantidad_personas">Cantidad de personas</Label>
                 <Input
                   id="cantidad_personas"
+                  data-cy="input-cantidad_personas"
                   type="number"
                   min={1}
                   value={formData.cantidad_personas}
@@ -732,6 +741,7 @@ export default function ReservasPage() {
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
+                      data-cy="combo-mesa-trigger"
                       variant={showError("id_mesa") ? "destructive" : "outline"}
                       role="combobox"
                       className="w-full justify-between"
@@ -801,6 +811,7 @@ export default function ReservasPage() {
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
+                      data-cy="combo-cliente-trigger"
                       variant={showError("id_cliente") ? "destructive" : "outline"}
                       role="combobox"
                       className="w-full justify-between"
@@ -918,7 +929,7 @@ export default function ReservasPage() {
                 <div className="grid gap-1.5">
 
 
-                  
+
                   <Label>Productos del menú</Label>
                   <Popover open={productoOpen} onOpenChange={setProductoOpen}>
                     <PopoverTrigger asChild>
@@ -1037,65 +1048,65 @@ export default function ReservasPage() {
                       </Table>
 
 
-                      
+
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">Aún no agregaste productos.</p>
                   )}
                 </div>
-                
+
               )
-              
-              
+
+
               }
 
               {hasMenu && (
 
-                              <div className="grid gap-1.5">
-                <Label htmlFor="senia">Seña</Label>
-                <Input
-                  id="senia"
-                  type="number"
-                  min={0}
-                  value={formData.menu_reserva?.monto_seña ?? 0}
-                  onChange={(e) => {
-                    const val = Number(e.target.value || 0)
-                    setFormData(fd => ({
-                      ...fd,
-                      menu_reserva: {
-                        ...(fd.menu_reserva ?? { monto_seña: 0, detalles_menu: [] }),
-                        monto_seña: val
-                      }
-                    }))
-                  }}
-                  onBlur={() => markTouched("menu_reserva")}
-                  aria-invalid={!!(touched.menu_reserva && formErrors.menu_reserva)}
-                  aria-describedby={touched.menu_reserva && formErrors.menu_reserva ? "menu-error" : undefined}
-                  className={touched.menu_reserva && formErrors.menu_reserva ? errorClass : undefined}
-                />
-                {touched.menu_reserva && formErrors.menu_reserva && (
-                  <p id="menu-error" className="text-sm text-red-600">{formErrors.menu_reserva}</p>
-                )}
-                {/* Sugerencia opcional si querés mostrar el 30% sin validar duro */}
-                {Number(formData.cantidad_personas) >= 6 && (
-                  <p className="text-xs text-muted-foreground">
-                    Sugerido: al menos 30% del total del menú.
-                  </p>
-                )}
-              </div>)
-              
-              
+                <div className="grid gap-1.5">
+                  <Label htmlFor="senia">Seña</Label>
+                  <Input
+                    id="senia"
+                    type="number"
+                    min={0}
+                    value={formData.menu_reserva?.monto_seña ?? 0}
+                    onChange={(e) => {
+                      const val = Number(e.target.value || 0)
+                      setFormData(fd => ({
+                        ...fd,
+                        menu_reserva: {
+                          ...(fd.menu_reserva ?? { monto_seña: 0, detalles_menu: [] }),
+                          monto_seña: val
+                        }
+                      }))
+                    }}
+                    onBlur={() => markTouched("menu_reserva")}
+                    aria-invalid={!!(touched.menu_reserva && formErrors.menu_reserva)}
+                    aria-describedby={touched.menu_reserva && formErrors.menu_reserva ? "menu-error" : undefined}
+                    className={touched.menu_reserva && formErrors.menu_reserva ? errorClass : undefined}
+                  />
+                  {touched.menu_reserva && formErrors.menu_reserva && (
+                    <p id="menu-error" className="text-sm text-red-600">{formErrors.menu_reserva}</p>
+                  )}
+                  {/* Sugerencia opcional si querés mostrar el 30% sin validar duro */}
+                  {Number(formData.cantidad_personas) >= 6 && (
+                    <p className="text-xs text-muted-foreground">
+                      Sugerido: al menos 30% del total del menú.
+                    </p>
+                  )}
+                </div>)
+
+
               }
 
 
             </div>
 
 
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 z-10 bg-background p-6 border-t">
               <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
                 Cancelar
               </Button>
-              <Button onClick={handleSave} disabled={saving || !isFormValid}>
+              <Button data-cy="btn-submit-reserva" onClick={handleSave} disabled={saving || !isFormValid}>
                 {selectedReserva ? "Guardar Cambios" : "Crear Reserva"}
               </Button>
             </DialogFooter>

@@ -8,6 +8,7 @@ class CartaFilter(Filter):
     nombre__ilike: str | None = None       # ?nombre__ilike=juan
     created_at__gte: str | None = None     # ?created_at__gte=2025-01-01
     created_at__lte: str | None = None     # ?created_at__lte=2025-12-31
+    baja: bool = False                     # Por defecto excluir cartas dadas de baja
 
     # orden: ?order_by=-created_at&order_by=nombre
     order_by: list[str] | None = None

@@ -283,6 +283,7 @@ export default function MesasPage() {
       setMesaToDelete(null)
     } catch (e) {
       console.error("Error eliminando mesa:", e)
+      toast.error("No se pudo eliminar la mesa", { description: extractApiErrorMessage(e) })
     }
   }
 

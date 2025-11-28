@@ -7,7 +7,7 @@ class Cliente(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, index=True)
     apellido = Column(String, index=True)
-    dni = Column(String, index=True, unique=True)
+    dni = Column(String, index=True)
     telefono = Column(String)
     baja = Column(Boolean, nullable=False, server_default="0", index=True)
     created_at = Column(DateTime, server_default=func.now(), index=True)

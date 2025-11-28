@@ -9,6 +9,10 @@ import SectoresPage from './pages/sectores/SectoresPage';
 import ReservasPage from './pages/reservas/ReservasPage';
 import { Toaster } from "sonner"
 import CartaPage from './pages/carta/CartaPage';
+import ComandasPage from './pages/comandas/ComandasPage';
+import FacturasPage from './pages/facturacion/FacturacionPage';
+import ReportesPage from './pages/reportes/ReportesPage';
+import MejoresPlatosPage from './pages/reportes/MejoresPlatosPage';
 
 function App() {
   return (
@@ -25,6 +29,10 @@ function App() {
           <Route path="sectores" element={<SectoresPage />} />
           <Route path="reservas" element={<ReservasPage />} />
           <Route path="cartas" element={<CartaPage />} />
+          <Route path="comandas" element={<ComandasPage />} />
+          <Route path="facturacion" element={<FacturasPage />} />
+          <Route path="reportes" element={<ReportesPage />} />
+          <Route path="reportes/mejoresplatos" element={<MejoresPlatosPage />} />
         </Route>
         
         {/* Ruta para "Página no encontrada" (404) */}

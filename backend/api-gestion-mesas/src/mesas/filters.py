@@ -9,7 +9,7 @@ class MesasFilter(Filter):
     cantidad__gte: int | None = None
     cantidad__lte: int | None = None
     id_sector: int | None = None
-    baja: bool | None = None
+    baja: bool = False  # Por defecto excluir bajas lógicas
     created_at__gte: str | None = None
     created_at__lte: str | None = None
     

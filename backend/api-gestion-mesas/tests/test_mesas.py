@@ -1,5 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import patch, AsyncMock
 
 # --- Solución al problema de importación ---
 import sys
@@ -271,3 +272,178 @@ def test_modificar_mesa(client):
     # Verificar que el cambio persiste
     response_get = client.get(f"/mesas/{mesa_id}")
     assert response_get.json()["cantidad"] == 6
+
+def mock_httpx_client():
+    """Helper para mockear httpx.AsyncClient con respuesta exitosa"""
+    from unittest.mock import Mock
+    mock_response = Mock()
+    mock_response.json.return_value = {"total": 0}
+    mock_response.raise_for_status.return_value = None
+
+    mock_client_instance = AsyncMock()
+    mock_client_instance.get = AsyncMock(return_value=mock_response)
+    mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+    mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+
+    return mock_client_instance
+
+@patch('httpx.AsyncClient')
+def test_eliminar_mesa(mock_client_class, client):
+    """
+    Test para verificar la eliminación lógica de una mesa.
+    """
+    mock_client_class.return_value = mock_httpx_client()
+
+    # Crear sector y mesa
+    client.post("/sectores/", json={"nombre": "Sector Test", "numero": "T01"})
+    response_creacion = client.post("/mesas/", json={"numero": "M01", "tipo": "interior", "cantidad": 4, "id_sector": 1})
+    mesa_id = response_creacion.json()["id"]
+
+    # Eliminar mesa (baja lógica)
+    response_delete = client.delete(f"/mesas/{mesa_id}")
+    assert response_delete.status_code == 204
+
+    # Verificar que está dada de baja
+    response_get = client.get(f"/mesas/{mesa_id}")
+    assert response_get.json()["baja"] == True
+
+@patch('httpx.AsyncClient')
+def test_eliminar_mesa_con_reservas_activas(mock_client_class, client):
+    """
+    Test para verificar que no se puede eliminar una mesa con reservas activas.
+    """
+    from unittest.mock import Mock
+    # Mock para reservas (con reservas activas)
+    mock_response_reservas = Mock()
+    mock_response_reservas.json.return_value = {"total": 1}
+    mock_response_reservas.raise_for_status.return_value = None
+
+    # Mock para comandas (sin comandas)
+    mock_response_comandas = Mock()
+    mock_response_comandas.json.return_value = {"total": 0}
+    mock_response_comandas.raise_for_status.return_value = None
+
+    mock_client_instance = AsyncMock()
+    mock_client_instance.get = AsyncMock(side_effect=[mock_response_reservas, mock_response_comandas])
+    mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+    mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+
+    mock_client_class.return_value = mock_client_instance
+
+    # Crear sector y mesa
+    client.post("/sectores/", json={"nombre": "Sector Test", "numero": "T01"})
+    response_creacion = client.post("/mesas/", json={"numero": "M01", "tipo": "interior", "cantidad": 4, "id_sector": 1})
+    mesa_id = response_creacion.json()["id"]
+
+    # Intentar eliminar mesa
+    response_delete = client.delete(f"/mesas/{mesa_id}")
+    assert response_delete.status_code == 409
+    assert "reservas activas" in response_delete.json()["detail"]
+
+@patch('httpx.AsyncClient')
+def test_eliminar_mesa_con_comandas_pendientes(mock_client_class, client):
+    """
+    Test para verificar que no se puede eliminar una mesa con comandas pendientes.
+    """
+    from unittest.mock import Mock
+    # Mock para reservas (sin reservas activas)
+    mock_response_reservas = Mock()
+    mock_response_reservas.json.return_value = {"total": 0}
+    mock_response_reservas.raise_for_status.return_value = None
+
+    # Mock para comandas pendientes (sin comandas)
+    mock_response_pendientes = Mock()
+    mock_response_pendientes.json.return_value = {"total": 0}
+    mock_response_pendientes.raise_for_status.return_value = None
+
+    # Mock para comandas facturadas (con comandas)
+    mock_response_facturadas = Mock()
+    mock_response_facturadas.json.return_value = {"total": 1}
+    mock_response_facturadas.raise_for_status.return_value = None
+
+    mock_client_instance = AsyncMock()
+    mock_client_instance.get = AsyncMock(side_effect=[mock_response_reservas, mock_response_pendientes, mock_response_facturadas])
+    mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+    mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+
+    mock_client_class.return_value = mock_client_instance
+
+    # Crear sector y mesa
+    client.post("/sectores/", json={"nombre": "Sector Test", "numero": "T01"})
+    response_creacion = client.post("/mesas/", json={"numero": "M01", "tipo": "interior", "cantidad": 4, "id_sector": 1})
+    mesa_id = response_creacion.json()["id"]
+
+    # Intentar eliminar mesa
+    response_delete = client.delete(f"/mesas/{mesa_id}")
+    assert response_delete.status_code == 409
+    assert "comandas facturadas" in response_delete.json()["detail"]
+
+def test_eliminar_sector(client):
+    """
+    Test para verificar la eliminación lógica de un sector.
+    """
+    # Crear sector sin mesas
+    response_creacion = client.post("/sectores/", json={"nombre": "Sector Test", "numero": "T01"})
+    sector_id = response_creacion.json()["id"]
+
+    # Eliminar sector (baja lógica)
+    response_delete = client.delete(f"/sectores/{sector_id}")
+    assert response_delete.status_code == 204
+
+    # Verificar que está dado de baja
+    response_get = client.get(f"/sectores/{sector_id}")
+    assert response_get.json()["baja"] == True
+
+def test_eliminar_sector_con_mesas_activas(client):
+    """
+    Test para verificar que no se puede eliminar un sector con mesas activas.
+    """
+    # Crear sector y mesa
+    client.post("/sectores/", json={"nombre": "Sector Test", "numero": "T01"})
+    client.post("/mesas/", json={"numero": "M01", "tipo": "interior", "cantidad": 4, "id_sector": 1})
+
+    # Intentar eliminar sector
+    response_delete = client.delete("/sectores/1")
+    assert response_delete.status_code == 409
+    assert "mesas activas" in response_delete.json()["detail"]
+
+
+def test_reutilizar_numero_sector_despues_baja(client):
+    """
+    Test para verificar que se puede reutilizar el número de un sector eliminado lógicamente.
+    """
+    # Crear sector
+    client.post("/sectores/", json={"nombre": "Sector Original", "numero": "001"})
+
+    # Eliminar sector (baja lógica)
+    response_delete = client.delete("/sectores/1")
+    assert response_delete.status_code == 204
+
+    # Crear nuevo sector con el mismo número debería funcionar
+    response_nuevo = client.post("/sectores/", json={"nombre": "Sector Nuevo", "numero": "001"})
+    assert response_nuevo.status_code == 200
+    data = response_nuevo.json()
+    assert data["numero"] == "001"
+    assert data["nombre"] == "Sector Nuevo"
+
+@patch('httpx.AsyncClient')
+def test_reutilizar_numero_mesa_despues_baja(mock_client_class, client):
+    """
+    Test para verificar que se puede reutilizar el número de una mesa eliminada lógicamente.
+    """
+    mock_client_class.return_value = mock_httpx_client()
+
+    # Crear sector y mesa
+    client.post("/sectores/", json={"nombre": "Sector Test", "numero": "T01"})
+    client.post("/mesas/", json={"numero": "M01", "tipo": "interior", "cantidad": 4, "id_sector": 1})
+
+    # Eliminar mesa (baja lógica)
+    response_delete = client.delete("/mesas/1")
+    assert response_delete.status_code == 204
+
+    # Crear nueva mesa con el mismo número en el mismo sector debería funcionar
+    response_nueva = client.post("/mesas/", json={"numero": "M01", "tipo": "exterior", "cantidad": 6, "id_sector": 1})
+    assert response_nueva.status_code == 200
+    data = response_nueva.json()
+    assert data["numero"] == "M01"
+    assert data["tipo"] == "exterior"
